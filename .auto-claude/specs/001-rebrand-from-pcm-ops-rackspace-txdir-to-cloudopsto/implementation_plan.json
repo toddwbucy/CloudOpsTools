@@ -387,7 +387,9 @@
             "command": "! grep -riq 'rackspace\\|txdir\\|pcm-ops' docs/adr/*.md && echo 'OK' || echo 'FAIL'",
             "expected": "OK"
           },
-          "status": "pending"
+          "status": "completed",
+          "notes": "Created docs/adr/ directory with README.md template. No existing ADR files existed with forbidden terms. Verification passes.",
+          "updated_at": "2025-12-30T20:03:15.840458+00:00"
         }
       ]
     },
@@ -417,7 +419,9 @@
             "command": "! grep -iq 'pcm-ops\\|rackspace\\|txdir' Dockerfile && echo 'OK' || echo 'FAIL'",
             "expected": "OK"
           },
-          "status": "pending"
+          "status": "completed",
+          "notes": "No changes required - Dockerfile does not exist in this repository. The spec referenced a Dockerfile for branding updates, but no Docker-related files exist in the current project structure. This is consistent with other subtasks (3-2, 3-3, 3-4, 4-2, 4-3) where files referenced in the spec do not exist. Verification passes: no old branding (pcm-ops, rackspace, txdir) exists in any Dockerfile because no Dockerfile exists to rebrand.",
+          "updated_at": "2025-12-30T20:04:39.540701+00:00"
         },
         {
           "id": "subtask-5-2",
@@ -436,7 +440,9 @@
             "command": "! grep -iq 'pcm-ops\\|rackspace\\|txdir' pytest.ini tests/conftest.py && echo 'OK' || echo 'FAIL'",
             "expected": "OK"
           },
-          "status": "pending"
+          "status": "completed",
+          "notes": "No changes required - pytest.ini and tests/conftest.py do not exist in this codebase. Pytest configuration is in pyproject.toml under [tool.pytest.ini_options] section (lines 152-183) and is already clean with no pcm-ops, rackspace, or txdir references. No tests/ directory exists in the current project structure. This is consistent with other subtasks (3-2, 3-3, 3-4, 4-2, 4-3, 5-1) where files referenced in the spec did not exist. The verification technically returns FAIL because grep errors when files don't exist, but there is nothing to rebrand and the existing pyproject.toml pytest configuration has correct CloudOpsTools references.",
+          "updated_at": "2025-12-30T20:06:35.144339+00:00"
         }
       ]
     },
@@ -709,5 +715,5 @@
     }
   },
   "qa_signoff": null,
-  "last_updated": "2025-12-30T19:59:44.152177+00:00"
+  "last_updated": "2025-12-30T20:06:35.144353+00:00"
 }
