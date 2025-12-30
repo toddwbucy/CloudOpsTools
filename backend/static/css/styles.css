@@ -1,0 +1,80 @@
+/**
+ * PCM-Ops Tools Application Styles
+ * 
+ * This file contains application-specific styles that are not theme-related.
+ */
+
+/* Script preview styling */
+.script-preview {
+  max-height: 100px;
+  overflow-y: auto;
+  font-size: 0.875rem;
+}
+
+/* Layout spacing */
+.main-content {
+  padding: 2rem 0;
+  min-height: calc(100vh - 150px);
+}
+
+footer {
+  margin-top: 3rem;
+  padding: 1rem 0;
+  font-size: 0.9rem;
+}
+
+/* Form styling */
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.required-field::after {
+  content: "*";
+  color: #e74c3c;
+  margin-left: 4px;
+}
+
+/* AWS specific styles */
+.aws-credentials-form {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.aws-tool-card {
+  height: 100%;
+}
+
+/* Script runner styles */
+.script-output {
+  background-color: #303030;
+  color: #fff;
+  font-family: monospace;
+  padding: 1rem;
+  border-radius: 0.25rem;
+  max-height: 500px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+/* AWS credentials modal */
+#awsCredentialsModal .modal-header {
+  border-bottom-color: #444;
+}
+
+#awsCredentialsModal .modal-footer {
+  border-top-color: #444;
+}
+
+#credentials_block, #credentials-block-pane textarea {
+  font-family: monospace;
+  font-size: 0.85rem;
+}
+
+/* Utility classes */
+.font-monospace {
+  font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.text-small {
+  font-size: 0.85rem;
+}

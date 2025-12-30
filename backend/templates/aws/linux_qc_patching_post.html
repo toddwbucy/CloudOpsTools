@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block title %}Linux QC Patching Post Tool{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <h1 class="mb-4">
+                <i class="bi bi-check-circle-fill me-2"></i>Linux QC Patching Post Tool
+            </h1>
+            
+            <!-- Credentials Section -->
+            <div class="card mb-3">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-key-fill me-2"></i>AWS Credentials</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <a href="/aws" class="btn btn-primary">
+                                <i class="bi bi-shield-lock me-2"></i>Set GOV Credentials
+                            </a>
+                            <span id="gov-creds-status" class="ms-2 badge {% if gov_credentials %}bg-success{% else %}bg-secondary{% endif %}">
+                                {% if gov_credentials %}Set{% else %}Not Set{% endif %}
+                            </span>
+                        </div>
+                        <div class="col-md-6">
+                            <a href="/aws" class="btn btn-primary">
+                                <i class="bi bi-cloud me-2"></i>Set COM Credentials
+                            </a>
+                            <span id="com-creds-status" class="ms-2 badge {% if com_credentials %}bg-success{% else %}bg-secondary{% endif %}">
+                                {% if com_credentials %}Set{% else %}Not Set{% endif %}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Change Management Section -->
+            {% set tool_name = 'linux-qc-patching-post' %}
+            {% set tool_endpoint = '/aws/linux-qc-patching-post' %}
+            {% include "aws/shared/change_management.html" %}
+
+            <!-- Connectivity Confirmation -->
+            <div class="card mb-3">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="bi bi-wifi me-2"></i>Connectivity Confirmation</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Confirm that all instances in the change are powered on and accessible before running QC scripts. This prevents job failures due to offline instances.</p>
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div id="connectivity-results" class="alert alert-secondary">
+                                <i class="bi bi-info-circle me-1"></i>Click "Confirm Connectivity" to verify all instances are online
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn btn-info w-100" onclick="testConnectivity()" 
+                                    {% if not current_change %}disabled{% endif %} id="test-connectivity-btn">
+                                <i class="bi bi-wifi me-2"></i>Confirm Connectivity
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Post-Patch Validation -->
+            <div class="card mb-3">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-check-circle me-2"></i>Post-Patch Validation</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <h6 class="text-primary">
+                            <i class="bi bi-patch-check-fill me-2"></i>
+                            Enhanced Post-Patch Validation
+                        </h6>
+                        <p class="text-muted">Comprehensive validation that servers have been successfully patched and rebooted. Includes kernel verification, critical service health checks, storage validation, and overall system status assessment.</p>
+                        
+                        <div class="alert alert-info mb-3">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <strong>This enhanced validation script will:</strong>
+                            <ul class="mb-0 mt-2">
+                                <li><strong>System Info:</strong> Check hostname, date, uptime, and boot time</li>
+                                <li><strong>Kernel Validation:</strong> Extract target kernel from patchme.sh and verify current kernel matches</li>
+                                <li><strong>Package Management:</strong> Display recent yum/apt history for today's date</li>
+                                <li><strong>Critical Services:</strong> Verify SFTD, CrowdStrike, EnCase, and BigFix agent status</li>
+                                <li><strong>Storage Health:</strong> Check disk space, LVM status (if configured)</li>
+                                <li><strong>System Health:</strong> Memory status, failed services, boot messages analysis</li>
+                                <li><strong>Final Status:</strong> Overall PASS/FAIL assessment with specific issue reporting</li>
+                            </ul>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="alert alert-secondary">
+                                    <strong>Enhanced Script Features:</strong>
+                                    <div class="row mt-2">
+                                        <div class="col-md-6">
+                                            <div class="bg-dark text-success p-2 rounded mb-2">
+                                                <strong><i class="bi bi-gear-fill me-1"></i> Service Checks:</strong><br>
+                                                <small>
+                                                ✓ SFTD Service Status<br>
+                                                ✓ CrowdStrike Falcon Sensor<br>
+                                                ✓ EnCase Agent Process<br>
+                                                ✓ BigFix Client Service
+                                                </small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="bg-dark text-info p-2 rounded mb-2">
+                                                <strong><i class="bi bi-cpu-fill me-1"></i> System Validation:</strong><br>
+                                                <small>
+                                                ✓ Kernel Version Match<br>
+                                                ✓ Disk Space & LVM Health<br>
+                                                ✓ Memory & Swap Status<br>
+                                                ✓ Failed Services Detection
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="bg-dark text-warning p-2 rounded">
+                                        <strong><i class="bi bi-check-circle-fill me-1"></i> Final Assessment:</strong><br>
+                                        <small>Provides clear PASS/FAIL status with specific issue reporting for troubleshooting</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-success w-100 mb-2" onclick="executePostValidation()" 
+                                        {% if not current_change %}disabled{% endif %} id="execute-validation-btn">
+                                    <i class="bi bi-play-circle me-2"></i>Run Enhanced Validation
+                                </button>
+                                <small class="text-muted d-block">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Comprehensive validation on all instances in the current change
+                                </small>
+                            </div>
+                        </div>
+                        <div id="validation-results" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Instance Selection (Hidden by default, shown when needed) -->
+            <div class="card mb-3" id="instance-selection" style="display: none;">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0"><i class="bi bi-server me-2"></i>Instance Selection</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <button class="btn btn-sm btn-outline-primary me-2" onclick="selectAllInstances()">Select All</button>
+                        <button class="btn btn-sm btn-outline-secondary me-2" onclick="deselectAllInstances()">Deselect All</button>
+                        <button class="btn btn-sm btn-outline-info" onclick="selectByKernel()">Select by Kernel</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead>
+                                <tr>
+                                    <th><input type="checkbox" id="select-all-instances"></th>
+                                    <th>Instance ID</th>
+                                    <th>Name</th>
+                                    <th>Account</th>
+                                    <th>Region</th>
+                                    <th>Kernel Info</th>
+                                </tr>
+                            </thead>
+                            <tbody id="instance-list">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Execution Results -->
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0"><i class="bi bi-terminal me-2"></i>Execution Results</h5>
+                </div>
+                <div class="card-body">
+                    <div id="execution-status"></div>
+                    <div id="execution-results"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Manual Instance Entry Modal -->
+<div class="modal fade" id="manualEntryModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Instances Manually</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Change Number</label>
+                    <input type="text" class="form-control" id="modal-change-number" readonly>
+                </div>
+                <hr>
+                <h6>Add Instance</h6>
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="form-label">Instance ID</label>
+                        <input type="text" class="form-control" id="modal-instance-id" placeholder="i-1234567890abcdef0">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Account ID</label>
+                        <input type="text" class="form-control" id="modal-account-id" placeholder="123456789012">
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-6">
+                        <label class="form-label">Region</label>
+                        <select class="form-select" id="modal-region">
+                            <option value="">Select Region</option>
+                            <option value="us-east-1">us-east-1</option>
+                            <option value="us-east-2">us-east-2</option>
+                            <option value="us-west-1">us-west-1</option>
+                            <option value="us-west-2">us-west-2</option>
+                            <option value="us-gov-west-1">us-gov-west-1</option>
+                            <option value="us-gov-east-1">us-gov-east-1</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Platform</label>
+                        <select class="form-select" id="modal-platform">
+                            <option value="linux" selected>Linux</option>
+                        </select>
+                    </div>
+                </div>
+                <button class="btn btn-primary mt-3" onclick="addManualInstance()">
+                    <i class="bi bi-plus-circle me-1"></i>Add Instance
+                </button>
+                
+                <div id="manual-instances-list" class="mt-3">
+                    <!-- Instances will be listed here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="saveManualChange()">Save Change</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Initialize manualInstances to avoid conflicts
+window.manualInstances = [];
+
+// Pass current change data from server to JavaScript
+{% if current_change %}
+window.currentChangeData = {{ current_change | tojson | safe }};
+{% endif %}
+</script>
+<script src="{{ url_for('static', path='/js/linux-qc-patching-post.js') }}?v={{ range(1000, 9999) | random }}"></script>
+{% endblock %}
