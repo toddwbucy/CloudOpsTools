@@ -1,0 +1,7 @@
+{
+  "task_description": "Complete rebranding of the entire repository to remove all references to Rackspace, TxDIR, and PCM-Ops, replacing them with generic CloudOpsTools branding. This affects 55+ files across multiple categories:\n\n1. User-Facing Elements (High Priority):\n- Remove/replace 7 logo files (4 Rackspace + 3 DIR)\n- Update HTML templates (header, footer, partnership badges)\n- Update CSS theme files (color schemes, class names)\n- Update browser tab titles and meta tags\n\n2. Configuration & Code (Medium Priority):\n- Update pyproject.toml (project name, description, authors)\n- Update backend/core/config.py (APP_NAME, database URL)\n- Update backend/main.py (API title, session cookie names)\n- Update JavaScript theme switcher (localStorage keys)\n- Migrate S3 bucket URL from pcm-ops-tools.s3.us-gov-west-1.amazonaws.com\n\n3. Documentation (17 files):\n- Update README.md, CLAUDE.md, architecture docs, ADRs\n- Update all markdown documentation files\n\n4. Scripts & Infrastructure (29 files):\n- Update shell scripts, Dockerfile, test files\n- Update monitoring and deployment scripts\n\n5. Database:\n- Update database name references (pcm_ops to cloudopstools)\n\nCritical considerations:\n- S3 bucket migration needs coordination\n- Database migration may require downtime planning\n- Need to maintain backwards compatibility during transition\n- Should create migration guide for existing installations",
+  "scoped_services": [],
+  "files_to_modify": [],
+  "files_to_reference": [],
+  "created_at": "2025-12-30T13:05:12.666516"
+}

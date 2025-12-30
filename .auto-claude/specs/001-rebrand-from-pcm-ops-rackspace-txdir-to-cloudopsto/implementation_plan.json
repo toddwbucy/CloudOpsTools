@@ -1,0 +1,691 @@
+{
+  "feature": "Complete Repository Rebranding to CloudOpsTools",
+  "workflow_type": "feature",
+  "workflow_rationale": "This is a feature workflow because it involves systematic changes across the entire codebase to implement a new branding identity. While it doesn't add new functionality, it requires careful coordination of changes across multiple file types (Python, JavaScript, HTML, CSS, markdown, shell scripts) and infrastructure components (database, S3, session management). The scope is large enough (55+ files) to warrant a structured feature implementation approach with proper testing and rollback planning.",
+  "phases": [
+    {
+      "id": "phase-1-core-config",
+      "name": "Core Configuration Updates",
+      "type": "implementation",
+      "description": "Update fundamental configuration files including pyproject.toml, config.py, and main.py. These are the foundation for all other changes.",
+      "depends_on": [],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-1-1",
+          "description": "Update pyproject.toml with CloudOpsTools branding",
+          "service": "main",
+          "files_to_modify": [
+            "pyproject.toml"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "pyproject.toml"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "grep -q 'name = \"cloudopstools\"' pyproject.toml && grep -q 'CloudOpsTools' pyproject.toml && echo 'OK'",
+            "expected": "OK"
+          },
+          "status": "completed",
+          "notes": "Updated pyproject.toml: changed name from 'pcm-ops-tools' to 'cloudopstools', description from 'PCM-Ops Tools' to 'CloudOpsTools', and authors from 'PCM-Ops Team' to 'CloudOpsTools Team'. Verification passed.",
+          "updated_at": "2025-12-30T19:20:50.358140+00:00"
+        },
+        {
+          "id": "subtask-1-2",
+          "description": "Update backend/core/config.py constants (APP_NAME, DATABASE_URL, SQLITE_DATABASE_URI)",
+          "service": "main",
+          "files_to_modify": [
+            "backend/core/config.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/core/config.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "grep -q 'APP_NAME.*CloudOpsTools' backend/core/config.py && grep -q 'cloudopstools.db' backend/core/config.py && echo 'OK'",
+            "expected": "OK"
+          },
+          "status": "completed",
+          "notes": "Updated backend/core/config.py: Changed APP_NAME from 'PCM-Ops Tools' to 'CloudOpsTools', changed DATABASE_URL and SQLITE_DATABASE_URI from 'pcm_ops_tools.db' to 'cloudopstools.db'. Verification passed.",
+          "updated_at": "2025-12-30T19:23:25.496087+00:00"
+        },
+        {
+          "id": "subtask-1-3",
+          "description": "Update backend/main.py (API title, session cookie name, logger name)",
+          "service": "main",
+          "files_to_modify": [
+            "backend/main.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/main.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "grep -q 'cloudopstools-session' backend/main.py && grep -q 'cloudopstools.main' backend/main.py && echo 'OK'",
+            "expected": "OK"
+          },
+          "status": "completed",
+          "notes": "Created backend/main.py with CloudOpsTools branding: logger name 'cloudopstools.main', session cookie 'cloudopstools-session', and API title using settings.APP_NAME. Verification passed.",
+          "updated_at": "2025-12-30T19:25:30.479929+00:00"
+        },
+        {
+          "id": "subtask-1-4",
+          "description": "Update .env and .env.example with new DATABASE_URL",
+          "service": "main",
+          "files_to_modify": [
+            ".env",
+            ".env.example"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            ".env.example"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "test -f .env.example && grep -q 'cloudopstools.db' .env.example && echo 'OK'",
+            "expected": "OK"
+          },
+          "status": "completed",
+          "notes": "Created .env.example with new DATABASE_URL (sqlite:///./data/cloudopstools.db). Also created .env file locally (not committed since it's in .gitignore, which is the correct security practice). Both files verified to contain cloudopstools.db.",
+          "updated_at": "2025-12-30T19:27:27.339323+00:00"
+        }
+      ]
+    },
+    {
+      "id": "phase-2-frontend-ui",
+      "name": "Frontend User-Facing Updates",
+      "type": "implementation",
+      "description": "Update HTML templates, CSS files, and remove/replace logo images to remove all visible Rackspace/TxDIR branding.",
+      "depends_on": [
+        "phase-1-core-config"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-2-1",
+          "description": "Update base.html template (title, header, branding)",
+          "service": "main",
+          "files_to_modify": [
+            "backend/templates/base.html"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/templates/base.html"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "grep -q 'CloudOpsTools' backend/templates/base.html && ! grep -iq 'rackspace\\|txdir\\|pcm-ops' backend/templates/base.html && echo 'OK' || echo 'FAIL'",
+            "expected": "OK"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-2-2",
+          "description": "Update all other HTML templates in backend/templates/",
+          "service": "main",
+          "files_to_modify": [
+            "backend/templates/index.html",
+            "backend/templates/cloud_service_uptime.html",
+            "backend/templates/aws/auth.html",
+            "backend/templates/aws/tools.html",
+            "backend/templates/aws/linux_qc_patching_prep.html",
+            "backend/templates/aws/linux_qc_patching_post.html",
+            "backend/templates/aws/sft_fixer.html",
+            "backend/templates/aws/shared/change_management.html",
+            "backend/templates/errors/404.html",
+            "backend/templates/errors/500.html"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/templates/base.html"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "! grep -riq 'rackspace\\|txdir\\|pcm-ops' backend/templates/ && echo 'OK' || echo 'FAIL'",
+            "expected": "OK"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-2-3",
+          "description": "Update CSS files with new branding and remove old class names",
+          "service": "main",
+          "files_to_modify": [
+            "backend/static/css/custom-theme.css",
+            "backend/static/css/styles.css"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/static/css/custom-theme.css"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "! grep -iq 'rackspace\\|txdir\\|pcm-ops' backend/static/css/*.css && echo 'OK' || echo 'FAIL'",
+            "expected": "OK"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-2-4",
+          "description": "Remove/replace logo images (7 files: 4 Rackspace + 3 DIR logos)",
+          "service": "main",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "manual",
+            "instructions": "Verify that Rackspace and DIR logo files have been removed or replaced from backend/static/images/"
+          },
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase-3-code-scripts",
+      "name": "Code and Scripts Updates",
+      "type": "implementation",
+      "description": "Update JavaScript files, Python logger names across 6 files, and shell scripts with new branding.",
+      "depends_on": [
+        "phase-1-core-config"
+      ],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-3-1",
+          "description": "Update theme-switcher.js localStorage key",
+          "service": "main",
+          "files_to_modify": [
+            "backend/static/js/theme-switcher.js"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/static/js/theme-switcher.js"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "grep -q 'cloudopstools-theme' backend/static/js/theme-switcher.js && ! grep -q 'pcm-ops-theme' backend/static/js/theme-switcher.js && echo 'OK'",
+            "expected": "OK"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-3-2",
+          "description": "Update logger names in Python files (pcm_ops_tools.* to cloudopstools.*)",
+          "service": "main",
+          "files_to_modify": [
+            "backend/core/utils/credential_helpers.py",
+            "backend/core/utils/logging_config.py",
+            "backend/db/init_db.py",
+            "backend/db/seeds/tool_disk_checker.py",
+            "backend/providers/aws/script_runner/api/executions_modular/tasks.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/main.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "! grep -r 'pcm_ops_tools\\.' backend/ --include='*.py' && echo 'OK' || echo 'FAIL'",
+            "expected": "OK"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-3-3",
+          "description": "Update S3 bucket URL in linux_qc_patching_prep.py",
+          "service": "main",
+          "files_to_modify": [
+            "backend/web/aws/linux_qc_patching_prep.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/web/aws/linux_qc_patching_prep.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "! grep -q 'pcm-ops-tools.s3' backend/web/aws/linux_qc_patching_prep.py && echo 'OK' || echo 'FAIL'",
+            "expected": "OK"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-3-4",
+          "description": "Update shell scripts (29 files) with new branding in comments and output",
+          "service": "main",
+          "files_to_modify": [
+            "monitor-health.sh",
+            "run-tests.sh",
+            "setup.sh",
+            "start.sh",
+            "start-staging.sh",
+            "stop.sh",
+            "test-ci.sh",
+            "quick-rollback.sh",
+            "scripts/setup_database.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "setup.sh"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "! grep -iq 'pcm-ops\\|rackspace\\|txdir' *.sh && echo 'OK' || echo 'FAIL'",
+            "expected": "OK"
+          },
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase-4-documentation",
+      "name": "Documentation Updates",
+      "type": "implementation",
+      "description": "Update all 17 documentation files (README, CLAUDE.md, architecture docs, ADRs) to remove Rackspace/TxDIR/PCM-Ops references.",
+      "depends_on": [
+        "phase-1-core-config"
+      ],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-4-1",
+          "description": "Update README.md with CloudOpsTools branding",
+          "service": "main",
+          "files_to_modify": [
+            "README.md"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "README.md"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "grep -q 'CloudOpsTools' README.md && ! grep -iq 'rackspace\\|txdir\\|pcm-ops' README.md && echo 'OK' || echo 'FAIL'",
+            "expected": "OK"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-4-2",
+          "description": "Update CLAUDE.md and other root-level documentation",
+          "service": "main",
+          "files_to_modify": [
+            "CLAUDE.md",
+            "BROWSER_DEBUGGING_STEPS.md",
+            "CSV_LOAD_TROUBLESHOOTING.md"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "CLAUDE.md"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "! grep -iq 'rackspace\\|txdir\\|pcm-ops' CLAUDE.md BROWSER_DEBUGGING_STEPS.md CSV_LOAD_TROUBLESHOOTING.md && echo 'OK' || echo 'FAIL'",
+            "expected": "OK"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-4-3",
+          "description": "Update architecture documentation in docs/",
+          "service": "main",
+          "files_to_modify": [
+            "docs/architecture.md",
+            "docs/Implementation-Action-Plan.md",
+            "docs/PRD-Production-Readiness.md",
+            "docs/Rollback-Procedures.md",
+            "docs/SPECIALIZED_TOOLS_PATTERN.md"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "docs/architecture.md"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "! grep -riq 'rackspace\\|txdir\\|pcm-ops' docs/*.md && echo 'OK' || echo 'FAIL'",
+            "expected": "OK"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-4-4",
+          "description": "Update ADRs and other documentation in docs/adr/",
+          "service": "main",
+          "files_to_modify": [
+            "docs/adr/infrastructure-compatibility-improvements.md"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "docs/adr/infrastructure-compatibility-improvements.md"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "! grep -riq 'rackspace\\|txdir\\|pcm-ops' docs/adr/*.md && echo 'OK' || echo 'FAIL'",
+            "expected": "OK"
+          },
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase-5-infrastructure",
+      "name": "Infrastructure Updates",
+      "type": "implementation",
+      "description": "Update Dockerfile and test files with new branding references.",
+      "depends_on": [
+        "phase-1-core-config"
+      ],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-5-1",
+          "description": "Update Dockerfile with new branding in labels and comments",
+          "service": "main",
+          "files_to_modify": [
+            "Dockerfile"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "Dockerfile"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "! grep -iq 'pcm-ops\\|rackspace\\|txdir' Dockerfile && echo 'OK' || echo 'FAIL'",
+            "expected": "OK"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-5-2",
+          "description": "Update test configuration files (pytest.ini, conftest.py)",
+          "service": "main",
+          "files_to_modify": [
+            "pytest.ini",
+            "tests/conftest.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "pytest.ini"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "! grep -iq 'pcm-ops\\|rackspace\\|txdir' pytest.ini tests/conftest.py && echo 'OK' || echo 'FAIL'",
+            "expected": "OK"
+          },
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase-6-migration-guide",
+      "name": "Migration Guide Creation",
+      "type": "implementation",
+      "description": "Create comprehensive migration guide documenting session invalidation, database rename procedures, S3 migration steps, and rollback procedures for existing deployments.",
+      "depends_on": [
+        "phase-1-core-config",
+        "phase-2-frontend-ui",
+        "phase-3-code-scripts",
+        "phase-4-documentation",
+        "phase-5-infrastructure"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-6-1",
+          "description": "Create MIGRATION_GUIDE.md with complete deployment instructions",
+          "service": "main",
+          "files_to_modify": [],
+          "files_to_create": [
+            "MIGRATION_GUIDE.md"
+          ],
+          "patterns_from": [
+            "docs/Rollback-Procedures.md"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "Verify MIGRATION_GUIDE.md includes: (1) Session cookie invalidation notice, (2) Database rename steps with backup instructions, (3) S3 bucket migration coordination, (4) Rollback procedures, (5) LocalStorage key changes impact"
+          },
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase-7-validation",
+      "name": "Comprehensive Validation",
+      "type": "integration",
+      "description": "Run all tests and perform end-to-end verification to ensure rebranding is complete and no functionality is broken.",
+      "depends_on": [
+        "phase-6-migration-guide"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-7-1",
+          "description": "Run unit tests to verify configuration changes",
+          "service": "main",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "command",
+            "command": "poetry run pytest tests/unit/ -v",
+            "expected": "All tests pass"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-7-2",
+          "description": "Run integration tests to verify API functionality",
+          "service": "main",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "command",
+            "command": "poetry run pytest tests/integration/ -v",
+            "expected": "All tests pass"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-7-3",
+          "description": "Verify application starts and health endpoints work",
+          "service": "main",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "api",
+            "method": "GET",
+            "url": "http://localhost:8500/api/health",
+            "expected_status": 200
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-7-4",
+          "description": "Browser verification - theme switcher and pages load correctly",
+          "service": "main",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:8500/",
+            "checks": [
+              "Page title shows CloudOpsTools",
+              "No Rackspace/TxDIR logos visible",
+              "Theme switcher works with cloudopstools-theme key",
+              "No console errors"
+            ]
+          },
+          "status": "pending"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_phases": 7,
+    "total_subtasks": 22,
+    "services_involved": [
+      "main"
+    ],
+    "parallelism": {
+      "max_parallel_phases": 3,
+      "parallel_groups": [
+        {
+          "phases": [
+            "phase-3-code-scripts",
+            "phase-4-documentation",
+            "phase-5-infrastructure"
+          ],
+          "reason": "All three depend only on phase-1-core-config and modify different file sets with no overlap"
+        }
+      ],
+      "recommended_workers": 1,
+      "speedup_estimate": "Limited parallelism due to single-service, sequential dependency structure. Max 3 phases can run concurrently after phase 1."
+    },
+    "startup_command": "source auto-claude/.venv/bin/activate && python auto-claude/run.py --spec 001 --parallel 1"
+  },
+  "verification_strategy": {
+    "risk_level": "high",
+    "skip_validation": false,
+    "test_creation_phase": "post_implementation",
+    "test_types_required": [
+      "unit",
+      "integration",
+      "e2e"
+    ],
+    "security_scanning_required": true,
+    "staging_deployment_required": true,
+    "acceptance_criteria": [
+      "All 55+ files updated with no remaining Rackspace/TxDIR/PCM-Ops references",
+      "All existing unit and integration tests pass",
+      "Application starts without errors",
+      "Health endpoints return 200 OK",
+      "Theme switcher works with new localStorage key",
+      "Session cookies use new name",
+      "Database references updated",
+      "Migration guide is complete and accurate",
+      "No console errors in browser",
+      "API documentation loads correctly"
+    ],
+    "verification_steps": [
+      {
+        "name": "Unit Tests",
+        "command": "poetry run pytest tests/unit/ -v",
+        "expected_outcome": "All tests pass",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Integration Tests",
+        "command": "poetry run pytest tests/integration/ -v",
+        "expected_outcome": "All integration tests pass",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "E2E Tests",
+        "command": "poetry run pytest tests/test_critical_paths.py -v",
+        "expected_outcome": "All critical path tests pass",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Security Scan - Secrets",
+        "command": "python auto-claude/scan_secrets.py --all-files --json",
+        "expected_outcome": "No secrets detected",
+        "type": "security",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Application Start",
+        "command": "poetry run uvicorn backend.main:app --host localhost --port 8500 &",
+        "expected_outcome": "Application starts without errors",
+        "type": "manual",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Health Check API",
+        "command": "curl -f http://localhost:8500/api/health",
+        "expected_outcome": "Returns 200 OK",
+        "type": "api",
+        "required": true,
+        "blocking": true
+      }
+    ],
+    "reasoning": "High risk rebranding affecting 55+ files, session management, and infrastructure. Requires comprehensive testing including unit, integration, e2e, security scanning, and manual browser verification."
+  },
+  "qa_acceptance": {
+    "unit_tests": {
+      "required": true,
+      "commands": [
+        "poetry run pytest tests/unit/ -v"
+      ],
+      "minimum_coverage": null
+    },
+    "integration_tests": {
+      "required": true,
+      "commands": [
+        "poetry run pytest tests/integration/ -v"
+      ],
+      "services_to_test": [
+        "main"
+      ]
+    },
+    "e2e_tests": {
+      "required": true,
+      "commands": [
+        "poetry run pytest tests/test_critical_paths.py -v"
+      ],
+      "flows": [
+        "home-page-load",
+        "theme-switching",
+        "api-health-check"
+      ]
+    },
+    "browser_verification": {
+      "required": true,
+      "pages": [
+        {
+          "url": "http://localhost:8500/",
+          "checks": [
+            "Page title is CloudOpsTools",
+            "No Rackspace/TxDIR branding visible",
+            "Theme switcher works",
+            "No console errors"
+          ]
+        },
+        {
+          "url": "http://localhost:8500/aws/tools",
+          "checks": [
+            "Branding consistent",
+            "No old logos",
+            "Navigation works"
+          ]
+        },
+        {
+          "url": "http://localhost:8500/docs",
+          "checks": [
+            "API docs show CloudOpsTools title",
+            "No errors"
+          ]
+        }
+      ]
+    },
+    "database_verification": {
+      "required": false,
+      "checks": []
+    }
+  },
+  "qa_signoff": null,
+  "last_updated": "2025-12-30T19:27:27.339339+00:00"
+}

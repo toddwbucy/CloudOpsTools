@@ -1,0 +1,815 @@
+{
+  "project_root": "/home/todd/git/CloudOpsTools",
+  "project_type": "single",
+  "services": {
+    "main": {
+      "name": "main",
+      "path": "/home/todd/git/CloudOpsTools",
+      "language": "Python",
+      "framework": "FastAPI",
+      "type": "backend",
+      "package_manager": "poetry",
+      "default_port": 8500,
+      "orm": "SQLAlchemy",
+      "key_directories": {
+        "tests": {
+          "path": "tests",
+          "purpose": "Tests"
+        }
+      },
+      "dependencies": [],
+      "dev_dependencies": [
+        "@stagewise/toolbar"
+      ],
+      "test_directory": "tests",
+      "dockerfile": "Dockerfile",
+      "api": {
+        "routes": [
+          {
+            "path": "/aws/linux-patcher",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/main.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/aws/linux-patcher/{path:path}",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/main.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/aws/linux-qc-prep",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/main.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/aws/linux-qc-prep/{path:path}",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/main.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/aws/linux-qc-post",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/main.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/aws/linux-qc-post/{path:path}",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/main.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/api/health",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/main.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/api/providers",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/main.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/web/home.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/cloud-service-uptime",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/web/home.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/api/service-status",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/web/home.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/api/backend-status",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/web/home.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/azure",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/web/home.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/gcp",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/web/home.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/servicenow",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/web/home.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/gcp",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/web/gcp/auth.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/aws",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/web/aws/auth.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/aws/tools",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/web/aws/auth.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/aws/authenticate",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/web/aws/auth.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/aws/test-credentials",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/web/aws/auth.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/aws/clear-credentials",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/web/aws/auth.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/aws/status",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/web/aws/auth.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/web/aws/linux_qc_patching_post.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/test-connectivity",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/web/aws/linux_qc_patching_post.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/execute-post-validation",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/web/aws/linux_qc_patching_post.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/validation-results/{batch_id}",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/web/aws/linux_qc_patching_post.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/load-change/{change_id}",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/web/aws/linux_qc_patching_post.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/list-changes",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/web/aws/linux_qc_patching_post.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/clear-change",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/web/aws/linux_qc_patching_post.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/save-change-with-instances",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/web/aws/linux_qc_patching_post.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/upload-change-csv",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/web/aws/linux_qc_patching_post.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/web/aws/sft_fixer.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/validate-instance",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/web/aws/sft_fixer.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/execute-script",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/web/aws/sft_fixer.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/batch-status/{batch_id}",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/web/aws/sft_fixer.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/web/aws/linux_qc_patching_prep.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/test-connectivity",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/web/aws/linux_qc_patching_prep.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/execute-qc-step",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/web/aws/linux_qc_patching_prep.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/latest-step1-results",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/web/aws/linux_qc_patching_prep.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/qc-results/{batch_id}",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/web/aws/linux_qc_patching_prep.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/load-change/{change_id}",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/web/aws/linux_qc_patching_prep.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/list-changes",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/web/aws/linux_qc_patching_prep.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/execute-step2-kernel-staging",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/web/aws/linux_qc_patching_prep.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/clear-change",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/web/aws/linux_qc_patching_prep.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/debug-session",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/web/aws/linux_qc_patching_prep.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/debug-session",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/web/aws/linux_qc_patching_prep.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/save-change-with-instances",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/web/aws/linux_qc_patching_prep.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/upload-change-csv",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/web/aws/linux_qc_patching_prep.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/execute-step2-multi-kernel",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/web/aws/linux_qc_patching_prep.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/download-reports",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/web/aws/linux_qc_patching_prep.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/download-final-report",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/web/aws/linux_qc_patching_prep.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/azure",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/web/azure/auth.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/servicenow",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/web/servicenow/auth.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/aws-credentials",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/api/auth.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/aws-credentials/{environment}",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/api/auth.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/aws-credentials",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/api/auth.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/aws-check-credentials",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/api/auth.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/api/tools.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/{tool_id}",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/api/tools.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/{tool_id}/execute",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/api/tools.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/{tool_id}/scripts",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/api/tools.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/feature-flags/health",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/api/feature_flags.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/feature-flags",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/api/feature_flags.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/feature-flags/{flag_name}",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/api/feature_flags.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/feature-flags/toggle",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/api/feature_flags.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/feature-flags/emergency-rollback",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/api/feature_flags.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/providers/aws/script_runner/api/instances.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/start",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/providers/aws/script_runner/api/aws_operations.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/{scan_id}",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/providers/aws/script_runner/api/aws_operations.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/{scan_id}/resume",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/providers/aws/script_runner/api/aws_operations.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/providers/aws/script_runner/api/aws_operations.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/providers/aws/script_runner/api/accounts.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/{account_id}",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/providers/aws/script_runner/api/accounts.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/{account_id}/instances",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/providers/aws/script_runner/api/accounts.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/{account_id}/instances/{instance_id}/status",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/providers/aws/script_runner/api/accounts.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/visit-organization",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/providers/aws/script_runner/api/org.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/organization-accounts",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/providers/aws/script_runner/api/org.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/providers/aws/script_runner/api/changes.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/providers/aws/script_runner/api/changes.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/{change_number}",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/providers/aws/script_runner/api/changes.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/compare",
+            "methods": [
+              "POST"
+            ],
+            "file": "backend/providers/aws/script_runner/api/changes.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/{change_number}",
+            "methods": [
+              "PUT"
+            ],
+            "file": "backend/providers/aws/script_runner/api/changes.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/{change_number}/instances",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/providers/aws/script_runner/api/changes.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          },
+          {
+            "path": "/batch/{batch_id}",
+            "methods": [
+              "GET"
+            ],
+            "file": "backend/providers/aws/script_runner/api/executions_modular/batch.py",
+            "framework": "FastAPI",
+            "requires_auth": false
+          }
+        ],
+        "total_routes": 84,
+        "methods": [
+          "GET",
+          "POST",
+          "PUT"
+        ],
+        "protected_routes": []
+      },
+      "api_documentation": {
+        "type": "openapi",
+        "auto_generated": true,
+        "docs_url": "/docs",
+        "redoc_url": "/redoc",
+        "openapi_url": "/openapi.json"
+      },
+      "monitoring": {
+        "health_checks": [
+          "/api/health",
+          "/feature-flags/health"
+        ]
+      }
+    }
+  },
+  "infrastructure": {
+    "dockerfile": "Dockerfile"
+  },
+  "conventions": {
+    "python_linting": "Ruff",
+    "python_formatting": "Black"
+  }
+}

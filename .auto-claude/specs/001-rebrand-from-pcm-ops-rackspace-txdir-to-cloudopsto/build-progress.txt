@@ -1,0 +1,101 @@
+=== AUTO-BUILD PROGRESS ===
+
+Project: CloudOpsTools Complete Repository Rebranding
+Workspace: Managed by auto-claude orchestrator
+Started: 2025-12-30
+
+Workflow Type: feature
+Rationale: Systematic changes across entire codebase to implement new branding identity. Requires coordination across 55+ files spanning Python, JavaScript, HTML, CSS, markdown, and shell scripts, plus infrastructure components (database, S3, session management).
+
+Session 1 (Planner):
+- ✅ Completed deep codebase investigation
+- ✅ Read existing context files (project_index.json, context.json, complexity_assessment.json)
+- ✅ Created comprehensive implementation_plan.json
+- ✅ Defined 7 phases with 22 subtasks
+- ✅ Created init.sh startup script
+- ✅ Created build-progress.txt tracking file
+
+Phase Summary:
+- Phase 1 (Core Configuration Updates): 4 subtasks, no dependencies
+  - Update pyproject.toml, config.py, main.py, .env files
+
+- Phase 2 (Frontend User-Facing Updates): 4 subtasks, depends on phase-1
+  - Update HTML templates, CSS, remove/replace logo images
+
+- Phase 3 (Code and Scripts Updates): 4 subtasks, depends on phase-1, parallel-safe
+  - Update JavaScript, Python logger names, S3 URL, shell scripts
+
+- Phase 4 (Documentation Updates): 4 subtasks, depends on phase-1, parallel-safe
+  - Update README, CLAUDE.md, architecture docs, ADRs
+
+- Phase 5 (Infrastructure Updates): 2 subtasks, depends on phase-1, parallel-safe
+  - Update Dockerfile, test configuration files
+
+- Phase 6 (Migration Guide Creation): 1 subtask, depends on phases 1-5
+  - Create comprehensive MIGRATION_GUIDE.md
+
+- Phase 7 (Comprehensive Validation): 4 subtasks, depends on phase-6
+  - Run unit tests, integration tests, health checks, browser verification
+
+Services Involved:
+- main: Python/FastAPI backend application (single service)
+
+Parallelism Analysis:
+- Max parallel phases: 3
+- Recommended workers: 1
+- Parallel groups:
+  * phases 3, 4, 5 can run in parallel (all depend only on phase-1, different file sets)
+- Speedup estimate: Limited parallelism due to single-service structure
+
+Verification Strategy:
+- Risk Level: HIGH
+- Test Types Required: unit, integration, e2e
+- Security Scanning: Required (secrets scan)
+- Staging Deployment: Required
+- Acceptance Criteria:
+  * All 55+ files updated with no remaining Rackspace/TxDIR/PCM-Ops references
+  * All existing tests pass
+  * Application starts without errors
+  * Health endpoints return 200 OK
+  * Theme switcher works with new localStorage key
+  * Session cookies use new name
+  * Database references updated
+  * Migration guide complete and accurate
+
+=== STARTUP COMMAND ===
+
+To continue building this spec, run:
+
+  source auto-claude/.venv/bin/activate && python auto-claude/run.py --spec 001 --parallel 1
+
+Example (from project root):
+  cd /home/todd/git/CloudOpsTools
+  source auto-claude/.venv/bin/activate
+  python auto-claude/run.py --spec 001 --parallel 1
+
+=== CRITICAL NOTES ===
+
+Breaking Changes in This Rebranding:
+1. Session cookie name changes from "pcm-ops-session" to "cloudopstools-session"
+   → ALL active users will be logged out
+
+2. Database file path changes from "pcm_ops_tools.db" to "cloudopstools.db"
+   → Manual database rename required (documented in migration guide)
+
+3. LocalStorage key changes from "pcm-ops-theme" to "cloudopstools-theme"
+   → User theme preferences will reset
+
+4. S3 bucket URL changes
+   → Requires external AWS admin coordination (documented in migration guide)
+
+5. Logger names change from "pcm_ops_tools.*" to "cloudopstools.*"
+   → Internal change only, no external impact
+
+=== END SESSION 1 ===
+
+Next Steps:
+1. Review implementation_plan.json for accuracy
+2. Run: python auto-claude/run.py --spec 001 --parallel 1
+3. Coder agent will implement subtasks sequentially
+4. QA agent will verify all acceptance criteria
+5. Create git commit after successful completion
