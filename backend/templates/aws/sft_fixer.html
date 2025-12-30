@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block title %}AWS SFT Fixer Tool{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <h1 class="mb-4">
+                <i class="bi bi-tools me-2"></i>AWS SFT Fixer Tool
+            </h1>
+            
+            <!-- Credentials Section -->
+            <div class="card mb-3">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-key-fill me-2"></i>AWS Credentials</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <a href="/aws" class="btn btn-primary">
+                                <i class="bi bi-shield-lock me-2"></i>Set GOV Credentials
+                            </a>
+                            <span id="gov-creds-status" class="ms-2 badge {% if gov_credentials %}bg-success{% else %}bg-secondary{% endif %}">
+                                {% if gov_credentials %}Set{% else %}Not Set{% endif %}
+                            </span>
+                        </div>
+                        <div class="col-md-6">
+                            <a href="/aws" class="btn btn-primary">
+                                <i class="bi bi-cloud me-2"></i>Set COM Credentials
+                            </a>
+                            <span id="com-creds-status" class="ms-2 badge {% if com_credentials %}bg-success{% else %}bg-secondary{% endif %}">
+                                {% if com_credentials %}Set{% else %}Not Set{% endif %}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tool Overview -->
+            <div class="card mb-3">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>SFT Fixer Overview</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info mb-3">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <strong>Use Case:</strong> This tool is designed to fix ScaleFT/SFT connectivity issues on individual instances when SSM is working but SFT is not accessible. This is NOT a bulk operation tool - it's designed to fix 1-2 machines at a time.
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="bg-dark text-success p-3 rounded">
+                                <h6><i class="bi bi-search me-2"></i>Detection</h6>
+                                <small>Checks if SFT is installed and identifies current state (service status, tokens, configuration)</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="bg-dark text-warning p-3 rounded">
+                                <h6><i class="bi bi-download me-2"></i>Installation</h6>
+                                <small>Installs ScaleFT on RHEL, Ubuntu, or Windows systems with proper enrollment configuration</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="bg-dark text-info p-3 rounded">
+                                <h6><i class="bi bi-arrow-clockwise me-2"></i>Reset</h6>
+                                <small>Resets existing SFT installation with fresh enrollment tokens and configuration</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Manual Instance Entry -->
+            <div class="card mb-3">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="bi bi-server me-2"></i>Target Instance Configuration</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-4">Enter the instance details for the system where SFT needs to be fixed. Ensure SSM connectivity is working before proceeding.</p>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="os-type" class="form-label">Operating System Type</label>
+                                <select class="form-select" id="os-type" required>
+                                    <option value="">Select OS Type</option>
+                                    <option value="linux">Linux (RHEL/Ubuntu/Amazon Linux)</option>
+                                    <option value="windows">Windows</option>
+                                </select>
+                                <div class="form-text">Select the operating system of the target instance</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="instance-id" class="form-label">Instance ID</label>
+                                <input type="text" class="form-control" id="instance-id" placeholder="i-1234567890abcdef0" required>
+                                <div class="form-text">AWS EC2 instance identifier (starts with i-)</div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="region" class="form-label">AWS Region</label>
+                                <select class="form-select" id="region" required>
+                                    <option value="">Select Region</option>
+                                    <option value="us-east-1">us-east-1</option>
+                                    <option value="us-east-2">us-east-2</option>
+                                    <option value="us-west-1">us-west-1</option>
+                                    <option value="us-west-2">us-west-2</option>
+                                    <option value="us-gov-west-1">us-gov-west-1</option>
+                                    <option value="us-gov-east-1">us-gov-east-1</option>
+                                </select>
+                                <div class="form-text">AWS region where the instance is located</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="account-number" class="form-label">Account Number</label>
+                                <input type="text" class="form-control" id="account-number" placeholder="123456789012" pattern="[0-9]{12}" required>
+                                <div class="form-text">12-digit AWS account number</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-center">
+                        <button class="btn btn-info" onclick="validateInstance()" id="validate-btn">
+                            <i class="bi bi-wifi me-2"></i>Validate SSM Connectivity
+                        </button>
+                    </div>
+                    
+                    <div id="validation-results" class="mt-3"></div>
+                </div>
+            </div>
+
+            <!-- SFT Operations -->
+            <div class="card mb-3" id="sft-operations" style="display: none;">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-gear-fill me-2"></i>SFT Operations</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-success">
+                        <i class="bi bi-check-circle me-2"></i>
+                        <strong>SSM Connectivity Confirmed!</strong> You can now run SFT operations on this instance.
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card border-info">
+                                <div class="card-header bg-info text-white">
+                                    <h6 class="mb-0"><i class="bi bi-search me-2"></i>Detect SFT</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p class="card-text small">Check if SFT is installed and get current status including service state, tokens, and configuration.</p>
+                                    <button class="btn btn-info btn-sm w-100" onclick="runDetection()" id="detect-btn">
+                                        <i class="bi bi-play-circle me-1"></i>Run Detection
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="card border-warning">
+                                <div class="card-header bg-warning text-dark">
+                                    <h6 class="mb-0"><i class="bi bi-download me-2"></i>Install SFT</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p class="card-text small">Install ScaleFT on systems where it's not present. Automatically detects Linux distribution.</p>
+                                    <button class="btn btn-warning btn-sm w-100" onclick="runInstallation()" id="install-btn" disabled>
+                                        <i class="bi bi-cloud-download me-1"></i>Install SFT
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="card border-danger">
+                                <div class="card-header bg-danger text-white">
+                                    <h6 class="mb-0"><i class="bi bi-arrow-clockwise me-2"></i>Reset SFT</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p class="card-text small">Reset existing SFT installation with fresh tokens and configuration. Use when SFT is installed but not working.</p>
+                                    <button class="btn btn-danger btn-sm w-100" onclick="runReset()" id="reset-btn" disabled>
+                                        <i class="bi bi-arrow-repeat me-1"></i>Reset SFT
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="operation-status" class="mt-3"></div>
+                </div>
+            </div>
+
+            <!-- Execution Results -->
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0"><i class="bi bi-terminal me-2"></i>Execution Results</h5>
+                </div>
+                <div class="card-body">
+                    <div id="execution-status"></div>
+                    <div id="execution-results"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', path='/js/sft-fixer.js') }}?v={{ range(1000, 9999) | random }}"></script>
+{% endblock %}

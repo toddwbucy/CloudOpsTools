@@ -1,0 +1,3 @@
+change_number,instance_id,account_id,region,platform,name
+CHG0012345,i-1234567890abcdef0,123456789012,us-east-1,linux,test-server-1
+CHG0012345,i-abcdef1234567890,123456789012,us-west-2,linux,test-server-2

@@ -1,0 +1,445 @@
+{% extends "base.html" %}
+
+{% block title %}AWS Authentication - PCM-Ops Tools{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="bi bi-aws me-2"></i>AWS Authentication
+                        </h4>
+                        <a href="/" class="btn btn-outline-light btn-sm">
+                            <i class="bi bi-arrow-left me-1"></i>Back to Providers
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Current Status -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="alert alert-{{ 'success' if com_credentials else 'warning' }} mb-0">
+                                <strong>Commercial (COM):</strong>
+                                {% if com_credentials %}
+                                    <i class="bi bi-check-circle me-1"></i>Authenticated
+                                {% else %}
+                                    <i class="bi bi-exclamation-triangle me-1"></i>Not Authenticated
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="alert alert-{{ 'success' if gov_credentials else 'warning' }} mb-0">
+                                <strong>GovCloud (GOV):</strong>
+                                {% if gov_credentials %}
+                                    <i class="bi bi-check-circle me-1"></i>Authenticated
+                                {% else %}
+                                    <i class="bi bi-exclamation-triangle me-1"></i>Not Authenticated
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Environment Selection -->
+                    <div class="mb-4">
+                        <label class="form-label fs-5"><strong>Select AWS Environment:</strong></label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="aws-environment" id="env-com" value="com" 
+                                   autocomplete="off" 
+                                   aria-describedby="env-com-help"
+                                   {% if not gov_credentials %}checked{% endif %}>
+                            <label class="btn btn-outline-info btn-lg" for="env-com">
+                                <i class="bi bi-cloud me-2"></i>Commercial (COM)
+                                {% if com_credentials %}<i class="bi bi-check-circle-fill text-success ms-2"></i>{% endif %}
+                            </label>
+                            
+                            <input type="radio" class="btn-check" name="aws-environment" id="env-gov" value="gov" 
+                                   autocomplete="off" 
+                                   aria-describedby="env-gov-help"
+                                   {% if gov_credentials and not com_credentials %}checked{% endif %}>
+                            <label class="btn btn-outline-warning btn-lg" for="env-gov">
+                                <i class="bi bi-shield-check me-2"></i>GovCloud (GOV)
+                                {% if gov_credentials %}<i class="bi bi-check-circle-fill text-success ms-2"></i>{% endif %}
+                            </label>
+                        </div>
+                        <div class="d-flex justify-content-between mt-2">
+                            <small id="env-com-help" class="text-muted">Standard AWS commercial cloud regions</small>
+                            <small id="env-gov-help" class="text-muted">AWS GovCloud regions for government workloads</small>
+                        </div>
+                    </div>
+
+                    <!-- Credential Input Form -->
+                    <div id="credential-form-container" style="display: none;">
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <strong>Enter your temporary AWS credentials.</strong> 
+                            These credentials have a 60-minute TTL and you'll need to re-authenticate periodically.
+                        </div>
+
+                        <form id="credential-form">
+                            <input type="hidden" id="credential-environment" name="environment">
+                            <input type="hidden" id="access-key" name="access_key">
+                            <input type="hidden" id="secret-key" name="secret_key">
+                            <input type="hidden" id="session-token" name="session_token">
+                            
+                            <!-- Single Input Box -->
+                            <div class="mb-4">
+                                <label for="single-credentials" class="form-label">
+                                    <strong>Enter your temporary AWS credentials</strong> <span class="text-danger">*</span>
+                                </label>
+                                <textarea class="form-control font-monospace" id="single-credentials" rows="12" required
+                                          autocomplete="off" spellcheck="false"
+                                          placeholder="Paste your complete AWS credentials here:&#10;&#10;Example 1 - Space/Line Separated:&#10;ASIA123456789ABCDEF0&#10;abcdefghijklmnopqrstuvwxyz1234567890ABCDEF&#10;IQoJb3JpZ2luX2VjEH...very-long-token...&#10;&#10;Example 2 - AWS CLI Format:&#10;[default]&#10;aws_access_key_id = ASIA123456789ABCDEF0&#10;aws_secret_access_key = abcdefghijklmnopqrstuvwxyz1234567890ABCDEF&#10;aws_session_token = IQoJb3JpZ2luX2VjEH...very-long-token...&#10;&#10;Example 3 - JSON Format:&#10;{'AccessKeyId': 'ASIA...', 'SecretAccessKey': '...', 'SessionToken': '...'}"></textarea>
+                                <div class="form-text">These credentials have a 60-minute TTL and you'll need to re-authenticate periodically.</div>
+                            </div>
+                            
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-success btn-lg">
+                                    <i class="bi bi-check-circle me-2"></i>Authenticate & Continue
+                                </button>
+                            </div>
+                        </form>
+
+                        <div class="row mt-4">
+                            <div class="col-md-6">
+                                <button type="button" class="btn btn-outline-secondary w-100" onclick="testCredentials()">
+                                    <i class="bi bi-gear me-2"></i>Test Credentials
+                                </button>
+                            </div>
+                            <div class="col-md-6">
+                                <button type="button" class="btn btn-outline-danger w-100" onclick="clearCredentials()">
+                                    <i class="bi bi-trash me-2"></i>Clear All Credentials
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Authenticated Actions -->
+                    {% if com_credentials or gov_credentials %}
+                    <div class="mt-4 p-3 bg-light rounded">
+                        <h6 class="mb-3">Ready to proceed! Choose what to do next:</h6>
+                        <div class="d-grid gap-2">
+                            <a href="/aws/tools" class="btn btn-primary">
+                                <i class="bi bi-tools me-2"></i>Browse AWS Tools
+                            </a>
+                            <a href="/aws/linux-qc-patching-prep" class="btn btn-outline-primary">
+                                <i class="bi bi-shield-check me-2"></i>Linux QC Patching
+                            </a>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Help Section -->
+                    <div class="mt-5">
+                        <div class="accordion" id="helpAccordion">
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#helpContent">
+                                        <i class="bi bi-question-circle me-2"></i>Need Help Getting Credentials?
+                                    </button>
+                                </h2>
+                                <div id="helpContent" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                                    <div class="accordion-body">
+                                        <h6>Credential Format Example:</h6>
+                                        <pre class="bg-dark text-light p-3 rounded"><code>[default]
+aws_access_key_id = ASIA1234567890123456
+aws_secret_access_key = 5JW4SE0QgO1234567890123456789012345678
+aws_session_token = FwoGZXIvYXdzEPf//////////wEaDHhskf1T6w3ko4IkdCLTAQHeM+th...</code></pre>
+                                        
+                                        <h6 class="mt-3">Important Notes:</h6>
+                                        <ul>
+                                            <li>All credentials have a <strong>60-minute TTL</strong></li>
+                                            <li>You'll need to re-authenticate when they expire</li>
+                                            <li>Session token is <strong>required</strong> for temporary credentials</li>
+                                            <li>COM = Commercial AWS, GOV = AWS GovCloud</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container position-fixed top-0 end-0 p-3"></div>
+
+<script>
+    // Environment selection handler
+    document.querySelectorAll('input[name="aws-environment"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            const formContainer = document.getElementById('credential-form-container');
+            const environmentField = document.getElementById('credential-environment');
+            
+            if (this.checked) {
+                formContainer.style.display = 'block';
+                environmentField.value = this.value;
+                
+                // Clear form when switching environments
+                document.getElementById('credential-form').reset();
+                environmentField.value = this.value;
+            }
+        });
+    });
+
+    
+    // Parse credentials function that returns an object
+    function parseCredentials(singleText) {
+        let accessKey = '';
+        let secretKey = '';
+        let sessionToken = '';
+        
+        try {
+            // Try parsing as JSON first
+            if (singleText.trim().startsWith('{') || (singleText.trim().startsWith('[') && singleText.includes('{') && singleText.includes('"'))) {
+                const data = JSON.parse(singleText);
+                accessKey = data.AccessKeyId || data.aws_access_key_id || data.accessKeyId || '';
+                secretKey = data.SecretAccessKey || data.aws_secret_access_key || data.secretAccessKey || '';
+                sessionToken = data.SessionToken || data.aws_session_token || data.sessionToken || '';
+            } else if (singleText.includes('aws_access_key_id') || singleText.includes('AccessKeyId')) {
+                // INI/config format
+                const lines = singleText.split('\n');
+                for (const line of lines) {
+                    const cleanLine = line.trim();
+                    if (cleanLine.includes('aws_access_key_id') || cleanLine.includes('AccessKeyId')) {
+                        // Split only on first '=' to handle secret keys with '=' in them
+                        const idx = cleanLine.indexOf('=');
+                        if (idx > -1) accessKey = cleanLine.substring(idx + 1).trim();
+                    } else if (cleanLine.includes('aws_secret_access_key') || cleanLine.includes('SecretAccessKey')) {
+                        // Split only on first '=' to handle secret keys with '=' in them
+                        const idx = cleanLine.indexOf('=');
+                        if (idx > -1) secretKey = cleanLine.substring(idx + 1).trim();
+                    } else if (cleanLine.includes('aws_session_token') || cleanLine.includes('SessionToken')) {
+                        // Split only on first '=' to handle session tokens with '=' in them
+                        const idx = cleanLine.indexOf('=');
+                        if (idx > -1) sessionToken = cleanLine.substring(idx + 1).trim();
+                    }
+                }
+            } else {
+                // Try space/line separated format
+                const parts = singleText.replace(/\s+/g, ' ').trim().split(/[\s\n]+/);
+                
+                // Look for AWS access key pattern (starts with ASIA or AKIA)
+                let accessKeyIndex = -1;
+                for (let i = 0; i < parts.length; i++) {
+                    if (parts[i].match(/^(ASIA|AKIA)[A-Z0-9]{16}$/)) {
+                        accessKeyIndex = i;
+                        accessKey = parts[i];
+                        break;
+                    }
+                }
+                
+                if (accessKeyIndex >= 0 && parts.length >= accessKeyIndex + 3) {
+                    secretKey = parts[accessKeyIndex + 1];
+                    sessionToken = parts[accessKeyIndex + 2];
+                    
+                    // If session token looks split, join remaining parts
+                    if (parts.length > accessKeyIndex + 3) {
+                        sessionToken = parts.slice(accessKeyIndex + 2).join('');
+                    }
+                } else {
+                    // Fallback: take first 3 non-empty parts
+                    const nonEmptyParts = parts.filter(p => p.length > 0);
+                    if (nonEmptyParts.length >= 3) {
+                        accessKey = nonEmptyParts[0];
+                        secretKey = nonEmptyParts[1];
+                        sessionToken = nonEmptyParts[2];
+                        
+                        if (nonEmptyParts.length > 3) {
+                            sessionToken = nonEmptyParts.slice(2).join('');
+                        }
+                    }
+                }
+            }
+            
+            return { accessKey, secretKey, sessionToken };
+            
+        } catch (error) {
+            console.error('Error parsing credentials:', error);
+            return { accessKey: '', secretKey: '', sessionToken: '' };
+        }
+    }
+
+    // Auto-select environment and show form on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        const comRadio = document.getElementById('env-com');
+        const govRadio = document.getElementById('env-gov');
+        const formContainer = document.getElementById('credential-form-container');
+        
+        // If an environment is already selected, show the form
+        if (comRadio.checked || govRadio.checked) {
+            formContainer.style.display = 'block';
+            document.getElementById('credential-environment').value = comRadio.checked ? 'com' : 'gov';
+        }
+    });
+
+    // Form submission
+    document.getElementById('credential-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        // Parse the single input field
+        const singleText = document.getElementById('single-credentials').value.trim();
+        if (!singleText) {
+            showToast('Please paste your AWS credentials', 'warning');
+            return;
+        }
+        
+        // Parse credentials from single input
+        const parsed = parseCredentials(singleText);
+        if (!parsed.accessKey || !parsed.secretKey || !parsed.sessionToken) {
+            showToast('Could not parse all required fields (access key, secret key, session token)', 'danger');
+            return;
+        }
+        
+        // Fill hidden fields
+        document.getElementById('access-key').value = parsed.accessKey;
+        document.getElementById('secret-key').value = parsed.secretKey;
+        document.getElementById('session-token').value = parsed.sessionToken;
+        
+        const formData = new FormData(this);
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        
+        // Show loading state
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="spinner-border spinner-border-sm me-2"></i>Authenticating...';
+        
+        try {
+            // Add CSRF token if available
+            const csrfToken = (window.Utils && typeof window.Utils.getCsrfToken === 'function')
+                ? window.Utils.getCsrfToken()
+                : (typeof getCsrfToken === 'function' ? getCsrfToken() : null);
+            const response = await fetch('/aws/authenticate', {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin',
+                headers: csrfToken ? { 'X-CSRFToken': csrfToken } : undefined
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                showToast('Authentication successful!', 'success');
+                
+                // Clear sensitive data from DOM before redirecting
+                setTimeout(() => {
+                    try {
+                        document.getElementById('single-credentials').value = '';
+                        document.getElementById('access-key').value = '';
+                        document.getElementById('secret-key').value = '';
+                        document.getElementById('session-token').value = '';
+                    } finally {
+                        window.location.href = '/aws/tools';
+                    }
+                }, 1000);
+            } else {
+                showToast('Authentication failed: ' + result.detail, 'danger');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        } catch (error) {
+            showToast('Error: ' + error.message, 'danger');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }
+    });
+
+    async function testCredentials() {
+        const environment = document.getElementById('credential-environment').value;
+        if (!environment) {
+            showToast('Please select an environment first', 'warning');
+            return;
+        }
+
+        const formData = new FormData(document.getElementById('credential-form'));
+        
+        try {
+            const csrfToken = (window.Utils && typeof window.Utils.getCsrfToken === 'function')
+                ? window.Utils.getCsrfToken()
+                : (typeof getCsrfToken === 'function' ? getCsrfToken() : null);
+            const response = await fetch('/aws/test-credentials', {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin',
+                headers: csrfToken ? { 'X-CSRFToken': csrfToken } : undefined
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                showToast('Credentials are valid!', 'success');
+            } else {
+                showToast('Credential test failed: ' + result.detail, 'danger');
+            }
+        } catch (error) {
+            showToast('Error testing credentials: ' + error.message, 'danger');
+        }
+    }
+
+    async function clearCredentials() {
+        if (!confirm('Clear all stored AWS credentials?')) return;
+        
+        try {
+            const csrfToken = (window.Utils && typeof window.Utils.getCsrfToken === 'function')
+                ? window.Utils.getCsrfToken()
+                : (typeof getCsrfToken === 'function' ? getCsrfToken() : null);
+            const headers = (window.Utils && typeof window.Utils.buildCsrfHeaders === 'function')
+                ? window.Utils.buildCsrfHeaders()
+                : (csrfToken ? { 'X-CSRFToken': csrfToken } : {});
+            const response = await fetch('/aws/clear-credentials', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: headers
+            });
+            
+            if (response.ok) {
+                showToast('Credentials cleared', 'info');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                showToast('Failed to clear credentials', 'danger');
+            }
+        } catch (error) {
+            showToast('Error: ' + error.message, 'danger');
+        }
+    }
+
+    function showToast(message, type = 'info') {
+        const toastContainer = document.querySelector('.toast-container');
+        const toastId = 'toast-' + Date.now();
+        
+        const toastHTML = `
+            <div id="${toastId}" class="toast" role="alert">
+                <div class="toast-header">
+                    <i class="bi bi-${type === 'success' ? 'check-circle-fill text-success' : 
+                                      type === 'danger' ? 'exclamation-triangle-fill text-danger' : 
+                                      type === 'warning' ? 'exclamation-triangle-fill text-warning' : 
+                                      'info-circle-fill text-info'} me-2"></i>
+                    <strong class="me-auto">AWS Authentication</strong>
+                    <small>just now</small>
+                    <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+                </div>
+                <div class="toast-body">
+                    ${message}
+                </div>
+            </div>
+        `;
+        
+        toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+        const toastElement = document.getElementById(toastId);
+        const toast = new bootstrap.Toast(toastElement, { delay: 5000 });
+        toast.show();
+        
+        // Remove toast element after it's hidden
+        toastElement.addEventListener('hidden.bs.toast', () => {
+            toastElement.remove();
+        });
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+
+{% block title %}Linux QC Patching Prep Tool{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <h1 class="mb-4">
+                <i class="bi bi-terminal-fill me-2"></i>Linux QC Patching Prep Tool
+            </h1>
+            
+            <!-- Credentials Section -->
+            <div class="card mb-3">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-key-fill me-2"></i>AWS Credentials</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <a href="/aws" class="btn btn-primary">
+                                <i class="bi bi-shield-lock me-2"></i>Set GOV Credentials
+                            </a>
+                            <span id="gov-creds-status" class="ms-2 badge {% if gov_credentials %}bg-success{% else %}bg-secondary{% endif %}">
+                                {% if gov_credentials %}Set{% else %}Not Set{% endif %}
+                            </span>
+                        </div>
+                        <div class="col-md-6">
+                            <a href="/aws" class="btn btn-primary">
+                                <i class="bi bi-cloud me-2"></i>Set COM Credentials
+                            </a>
+                            <span id="com-creds-status" class="ms-2 badge {% if com_credentials %}bg-success{% else %}bg-secondary{% endif %}">
+                                {% if com_credentials %}Set{% else %}Not Set{% endif %}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Change Management Section -->
+            {% set tool_name = 'linux-qc-patching-prep' %}
+            {% set tool_endpoint = '/aws/linux-qc-patching-prep' %}
+            {% include "aws/shared/change_management.html" %}
+
+            <!-- Connectivity Confirmation -->
+            <div class="card mb-3">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="bi bi-wifi me-2"></i>Connectivity Confirmation</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Confirm that all instances in the change are powered on and accessible before running QC scripts. This prevents job failures due to offline instances.</p>
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div id="connectivity-results" class="alert alert-secondary">
+                                <i class="bi bi-info-circle me-1"></i>Click "Confirm Connectivity" to verify all instances are online
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn btn-info w-100" onclick="testConnectivity()" 
+                                    {% if not current_change %}disabled{% endif %} id="test-connectivity-btn">
+                                <i class="bi bi-wifi me-2"></i>Confirm Connectivity
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- QC Workflow Steps -->
+            <div class="card mb-3">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-list-check me-2"></i>QC Workflow</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Step 1: Initial QC -->
+                    <div class="qc-step mb-4" id="step1">
+                        <h6 class="text-primary">
+                            <span class="badge bg-primary me-2">Step 1</span>
+                            Initial QC and Report Generation
+                        </h6>
+                        <p class="text-muted">Downloads latest patcher and runs initial QC with report generation. Results are automatically grouped by distribution and kernel version.</p>
+                        <div class="row">
+                            <div class="col-md-8">
+                                <pre class="bg-dark text-white p-2 rounded">{{ qc_scripts.step1_initial_qc.content }}</pre>
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-primary w-100" onclick="executeQCStep('step1_initial_qc')" 
+                                        {% if not current_change %}disabled{% endif %}>
+                                    <i class="bi bi-play-circle me-2"></i>Execute on All Instances
+                                </button>
+                            </div>
+                        </div>
+                        <div id="step1-results" class="mt-3"></div>
+                    </div>
+
+                    <!-- Step 2: Kernel Staging -->
+                    <div class="qc-step mb-4" id="step2">
+                        <h6 class="text-warning">
+                            <span class="badge bg-warning text-dark me-2">Step 2</span>
+                            Stage Kernel Versions by Group
+                        </h6>
+                        <p class="text-muted">After Step 1 completes, select kernel versions for each distribution/kernel group and stage them all in a single execution.</p>
+                        
+                        <!-- Kernel groups will be displayed here after Step 1 -->
+                        <div id="step2-kernel-groups" class="mb-3">
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle me-2"></i>
+                                Run Step 1 first to identify kernel groups
+                            </div>
+                        </div>
+                        
+                        <!-- Execute button for Step 2 (hidden until groups are loaded) -->
+                        <div id="step2-execute-section" style="display: none;">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <pre class="bg-dark text-white p-2 rounded">{{ qc_scripts.step2_kernel_staging.content }}</pre>
+                                </div>
+                                <div class="col-md-4">
+                                    <button class="btn btn-warning w-100" id="step2-execute-btn"
+                                            onclick="executeStep2AllGroups()">
+                                        <i class="bi bi-gear-wide-connected me-2"></i>Stage All Groups
+                                    </button>
+                                    <small class="text-muted mt-2 d-block">
+                                        <i class="bi bi-info-circle me-1"></i>
+                                        Will execute kernel staging for all groups with selected kernels
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="step2-results" class="mt-3"></div>
+                    </div>
+
+                    <!-- Step 3: Final Report -->
+                    <div class="qc-step mb-4" id="step3">
+                        <h6 class="text-success">
+                            <span class="badge bg-success me-2">Step 3</span>
+                            Final QC Report
+                        </h6>
+                        <p class="text-muted">Retrieves the final QC report and patch script</p>
+                        <div class="row">
+                            <div class="col-md-8">
+                                <pre class="bg-dark text-white p-2 rounded">{{ qc_scripts.step3_final_report.content }}</pre>
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-success w-100 mb-2" onclick="executeQCStep('step3_final_report')"
+                                        {% if not current_change %}disabled{% endif %}>
+                                    <i class="bi bi-file-text me-2"></i>Get All Reports
+                                </button>
+                                <div class="btn-group w-100 mb-2" role="group">
+                                    <button class="btn btn-outline-success" onclick="downloadFinalReports()"
+                                            {% if not current_change %}disabled{% endif %}>
+                                        <i class="bi bi-download me-1"></i>Final Report
+                                    </button>
+                                    <button class="btn btn-outline-secondary" onclick="downloadReports()"
+                                            {% if not current_change %}disabled{% endif %}>
+                                        <i class="bi bi-file-earmark-text me-1"></i>Full Report
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="step3-results" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Instance Selection (Hidden by default, shown when needed) -->
+            <div class="card mb-3" id="instance-selection" style="display: none;">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0"><i class="bi bi-server me-2"></i>Instance Selection</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <button class="btn btn-sm btn-outline-primary me-2" onclick="selectAllInstances()">Select All</button>
+                        <button class="btn btn-sm btn-outline-secondary me-2" onclick="deselectAllInstances()">Deselect All</button>
+                        <button class="btn btn-sm btn-outline-info" onclick="selectByKernel()">Select by Kernel</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead>
+                                <tr>
+                                    <th><input type="checkbox" id="select-all-instances"></th>
+                                    <th>Instance ID</th>
+                                    <th>Name</th>
+                                    <th>Account</th>
+                                    <th>Region</th>
+                                    <th>Kernel Info</th>
+                                </tr>
+                            </thead>
+                            <tbody id="instance-list">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Execution Results -->
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0"><i class="bi bi-terminal me-2"></i>Execution Results</h5>
+                </div>
+                <div class="card-body">
+                    <div id="execution-status"></div>
+                    <div id="execution-results"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Manual Instance Entry Modal -->
+<div class="modal fade" id="manualEntryModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Instances Manually</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Change Number</label>
+                    <input type="text" class="form-control" id="modal-change-number" readonly>
+                </div>
+                <hr>
+                <h6>Add Instance</h6>
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="form-label">Instance ID</label>
+                        <input type="text" class="form-control" id="modal-instance-id" placeholder="i-1234567890abcdef0">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Account ID</label>
+                        <input type="text" class="form-control" id="modal-account-id" placeholder="123456789012">
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-6">
+                        <label class="form-label">Region</label>
+                        <select class="form-select" id="modal-region">
+                            <option value="">Select Region</option>
+                            <option value="us-east-1">us-east-1</option>
+                            <option value="us-east-2">us-east-2</option>
+                            <option value="us-west-1">us-west-1</option>
+                            <option value="us-west-2">us-west-2</option>
+                            <option value="us-gov-west-1">us-gov-west-1</option>
+                            <option value="us-gov-east-1">us-gov-east-1</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Platform</label>
+                        <select class="form-select" id="modal-platform">
+                            <option value="linux" selected>Linux</option>
+                        </select>
+                    </div>
+                </div>
+                <button class="btn btn-primary mt-3" onclick="addManualInstance()">
+                    <i class="bi bi-plus-circle me-1"></i>Add Instance
+                </button>
+                
+                <div id="manual-instances-list" class="mt-3">
+                    <!-- Instances will be listed here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="saveManualChange()">Save Change</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Initialize manualInstances to avoid conflicts
+window.manualInstances = [];
+
+// Pass current change data from server to JavaScript
+{% if current_change %}
+window.currentChangeData = {{ current_change | tojson | safe }};
+{% endif %}
+</script>
+<script src="{{ url_for('static', path='/js/linux-qc-patching-prep.js') }}?v={{ range(1000, 9999) | random }}"></script>
+<script src="{{ url_for('static', path='/js/linux-qc-patching-prep-step2.js') }}?v={{ range(1000, 9999) | random }}"></script>
+{% endblock %}

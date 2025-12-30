@@ -1,0 +1,1 @@
+"""Shared AWS schemas for common use across providers"""
