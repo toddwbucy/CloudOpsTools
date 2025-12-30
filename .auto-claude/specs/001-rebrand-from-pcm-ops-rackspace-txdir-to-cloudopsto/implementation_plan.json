@@ -120,7 +120,9 @@
             "command": "grep -q 'CloudOpsTools' backend/templates/base.html && ! grep -iq 'rackspace\\|txdir\\|pcm-ops' backend/templates/base.html && echo 'OK' || echo 'FAIL'",
             "expected": "OK"
           },
-          "status": "pending"
+          "status": "completed",
+          "notes": "Updated base.html template with CloudOpsTools branding: (1) Changed page title from 'PCM-Ops Tools' to 'CloudOpsTools', (2) Updated header from 'Rackspace Tx-DIR Public Cloud Manager Operations' to 'CloudOpsTools', (3) Updated footer branding removing Rackspace/DIR logos and references, (4) Updated Stagewise projectId from 'pcm-ops-tools' to 'cloudopstools'. Verification passed - no Rackspace/TxDIR/PCM-Ops references remain.",
+          "updated_at": "2025-12-30T19:30:12.181288+00:00"
         },
         {
           "id": "subtask-2-2",
@@ -147,7 +149,9 @@
             "command": "! grep -riq 'rackspace\\|txdir\\|pcm-ops' backend/templates/ && echo 'OK' || echo 'FAIL'",
             "expected": "OK"
           },
-          "status": "pending"
+          "status": "completed",
+          "notes": "Verification passed - no old branding (rackspace, txdir, pcm-ops) found in backend/templates/. Only base.html exists currently and it already has correct CloudOpsTools branding. Other template files listed (index.html, cloud_service_uptime.html, aws/*.html, errors/*.html) don't exist yet - they will be created in future subtasks if needed.",
+          "updated_at": "2025-12-30T19:31:28.443343+00:00"
         },
         {
           "id": "subtask-2-3",
@@ -166,7 +170,9 @@
             "command": "! grep -iq 'rackspace\\|txdir\\|pcm-ops' backend/static/css/*.css && echo 'OK' || echo 'FAIL'",
             "expected": "OK"
           },
-          "status": "pending"
+          "status": "completed",
+          "notes": "Created backend/static/css/ directory and CSS files (custom-theme.css, styles.css) with CloudOpsTools branding. The CSS files did not exist previously - they were referenced in base.html but missing. Created with proper theme variables, brand colors, and component styling. No Rackspace/TxDIR/PCM-Ops branding references. Verification passed.",
+          "updated_at": "2025-12-30T19:34:59.934757+00:00"
         },
         {
           "id": "subtask-2-4",
@@ -179,7 +185,9 @@
             "type": "manual",
             "instructions": "Verify that Rackspace and DIR logo files have been removed or replaced from backend/static/images/"
           },
-          "status": "pending"
+          "status": "completed",
+          "notes": "Verified that all 7 logo files (4 Rackspace + 3 DIR) have been removed from the repository. The files were located in backend/static/img/logos/ (not backend/static/images/ as stated in spec). Files removed: Rackspace_Technology_Logo_RGB_RED.svg, Rackspace_Technology_Logo_RGB_WHT.svg, r-Icon-RGB-Red.svg, r-Icon-RGB-White.svg, dir-logo-blue.svg, dir-logo-white.svg, dir_banner_embedded.svg. The base.html template was already updated in subtask-2-1 to use text-based CloudOpsTools branding instead of logo images. No Rackspace/DIR logo references remain in the backend code.",
+          "updated_at": "2025-12-30T19:38:52.302907+00:00"
         }
       ]
     },
@@ -687,5 +695,5 @@
     }
   },
   "qa_signoff": null,
-  "last_updated": "2025-12-30T19:27:27.339339+00:00"
+  "last_updated": "2025-12-30T19:38:52.302916+00:00"
 }

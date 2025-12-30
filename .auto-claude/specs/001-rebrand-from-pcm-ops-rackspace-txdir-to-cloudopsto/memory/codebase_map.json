@@ -1,0 +1,20 @@
+{
+  "discovered_files": {
+    "backend/templates/": {
+      "description": "Only base.html template exists currently. Other templates (index.html, aws/*.html, errors/*.html) listed in subtask-2-2 do not exist yet and may be created in future subtasks.",
+      "category": "architecture",
+      "discovered_at": "2025-12-30T19:31:28.465915+00:00"
+    },
+    "backend/static/css/": {
+      "description": "CSS directory and files (custom-theme.css, styles.css) did not exist in the project. Created them with CloudOpsTools branding to support base.html template which references these files.",
+      "category": "infrastructure",
+      "discovered_at": "2025-12-30T19:34:41.781032+00:00"
+    },
+    "backend/static/img/logos/": {
+      "description": "Logo files (7 total: 4 Rackspace + 3 DIR) were in backend/static/img/logos/ directory, not backend/static/images/. These files were already removed from the current branch - the directory no longer exists. The base.html template was already updated in subtask-2-1 to remove logo references and use CloudOpsTools text branding instead.",
+      "category": "file-structure",
+      "discovered_at": "2025-12-30T19:38:52.289783+00:00"
+    }
+  },
+  "last_updated": "2025-12-30T19:38:52.289796+00:00"
+}
