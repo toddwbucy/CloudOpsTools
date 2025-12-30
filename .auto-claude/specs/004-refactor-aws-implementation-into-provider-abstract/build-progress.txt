@@ -1,0 +1,176 @@
+=== AUTO-BUILD PROGRESS ===
+
+Project: CloudOpsTools - Refactor AWS Implementation into Provider Abstraction
+Workspace: /home/todd/git/CloudOpsTools
+Started: 2025-12-30
+
+Workflow Type: refactor
+Rationale: This is a refactoring task following the migration workflow pattern - add new provider abstraction alongside existing AWS code, migrate workflows to use the abstraction, then remove direct AWS dependencies from web layer while maintaining 100% backward compatibility.
+
+Session 1 (Planner):
+- Created implementation_plan.json
+- Phases: 6
+- Total subtasks: 11
+- Created init.sh
+
+Phase Summary:
+- Phase 1 (Provider Interface Definition): 2 subtasks, depends on []
+  * Create provider base class with abstract methods
+  * Update provider registry to support provider factory pattern
+
+- Phase 2 (AWS Provider Implementation): 2 subtasks, depends on [phase-1-provider-interface]
+  * Create AWS provider wrapper implementing ProviderBase
+  * Register AWS provider in provider registry
+
+- Phase 3 (Multi-Provider Configuration): 1 subtask, depends on [phase-1-provider-interface]
+  * Add DEFAULT_PROVIDER setting and get_provider_credentials method
+
+- Phase 4 (Workflow Migration to Provider Abstraction): 4 subtasks, depends on [phase-2-aws-provider, phase-3-config-abstraction]
+  * Create workflows package and move auth.py
+  * Move linux_qc_patching_prep.py and decouple from AWS
+  * Move linux_qc_patching_post.py and decouple from AWS
+  * Move sft_fixer.py and decouple from AWS
+
+- Phase 5 (Main App Router Updates): 1 subtask, depends on [phase-4-workflow-migration]
+  * Update main.py router imports and include statements
+
+- Phase 6 (Remove Old AWS-Specific Workflow Files): 2 subtasks, depends on [phase-5-router-updates]
+  * Verify no AWS-specific imports in workflows directory
+  * Remove old workflow files from backend/web/aws/
+
+Services Involved:
+- main (backend): FastAPI backend with 84 API routes, SQLAlchemy ORM, port 8500
+
+Parallelism Analysis:
+- Max parallel phases: 2
+- Recommended workers: 1
+- Parallel groups:
+  * phase-1-provider-interface, phase-3-config-abstraction (Both create new code without dependencies on each other)
+- Speedup estimate: 1.15x faster than sequential (2 phases can run in parallel)
+
+Files to Create:
+- backend/providers/base.py (provider interface)
+- backend/providers/aws/provider.py (AWS implementation)
+- backend/web/workflows/__init__.py (workflows package)
+- backend/web/workflows/auth.py (provider-agnostic auth)
+- backend/web/workflows/linux_qc_patching_prep.py (decoupled workflow)
+- backend/web/workflows/linux_qc_patching_post.py (decoupled workflow)
+- backend/web/workflows/sft_fixer.py (decoupled workflow)
+
+Files to Modify:
+- backend/providers/__init__.py (add provider registry/factory)
+- backend/core/config.py (multi-provider credential storage)
+- backend/main.py (update router imports)
+
+Files to Remove (Phase 6):
+- backend/web/aws/auth.py
+- backend/web/aws/linux_qc_patching_prep.py
+- backend/web/aws/linux_qc_patching_post.py
+- backend/web/aws/sft_fixer.py
+
+Pattern Files Referenced:
+- backend/providers/aws/common/services/credential_manager.py (async credential management, aiobotocore)
+- backend/providers/aws/common/services/script_executor.py (ThreadPoolExecutor pattern, polling)
+- backend/web/aws/linux_qc_patching_prep.py (FastAPI dependency injection, session handling)
+- backend/core/config.py (Pydantic v2 settings pattern)
+
+Verification Strategy:
+- Risk Level: high
+- Test Types Required: unit, integration, e2e
+- Security Scan: No (internal refactoring only)
+- Staging Deployment: Yes (architectural change requires production-like validation)
+
+Critical Success Criteria:
+✅ All existing tests pass (zero regression)
+✅ New provider interface tests pass
+✅ AWS workflows function identically post-refactor
+✅ Zero AWS-specific imports in backend/web/workflows/
+✅ Configuration supports multi-provider credentials
+✅ Code passes Ruff linting and Black formatting
+
+Backward Compatibility Requirements:
+- Existing AWS_ACCESS_KEY_ID_COM, AWS_SECRET_ACCESS_KEY_COM env vars must still work
+- Existing AWS_ACCESS_KEY_ID_GOV, AWS_SECRET_ACCESS_KEY_GOV env vars must still work
+- All AWS workflow API contracts remain unchanged
+- No database schema changes
+- All existing services continue functioning identically
+
+=== STARTUP COMMAND ===
+
+To continue building this spec, run:
+
+  source auto-claude/.venv/bin/activate && python auto-claude/run.py --spec 004 --parallel 1
+
+Example for manual development:
+  cd /home/todd/git/CloudOpsTools
+  poetry install
+  poetry run uvicorn backend.main:app --reload --host 0.0.0.0 --port 8500
+
+Or use the init script:
+  cd .auto-claude/specs/004-refactor-aws-implementation-into-provider-abstract
+  ./init.sh
+
+=== END SESSION 1 ===
+
+=== IMPLEMENTATION COMPLETE ===
+
+Session 2 (Final Verification):
+Date: 2025-12-30
+
+✅ Phase 6 (Remove Old AWS-Specific Workflow Files) - COMPLETED
+
+subtask-6-2: Remove old workflow files from backend/web/aws/
+- Verified backend/web/aws/ directory does not exist
+- Confirmed all old files have been removed:
+  * backend/web/aws/auth.py - REMOVED
+  * backend/web/aws/linux_qc_patching_prep.py - REMOVED
+  * backend/web/aws/linux_qc_patching_post.py - REMOVED
+  * backend/web/aws/sft_fixer.py - REMOVED
+- New provider-agnostic workflows active at backend/web/workflows/
+
+=== REFACTORING SUMMARY ===
+
+All 12 subtasks across 6 phases: COMPLETED ✅
+
+Architectural Changes:
+1. Provider Interface: Created abstract ProviderBase class with 6 async methods
+2. Provider Registry: Factory pattern for provider instantiation
+3. AWS Provider: AWSProvider wrapper implementing ProviderBase
+4. Multi-Provider Config: Settings class with DEFAULT_PROVIDER and get_provider_credentials()
+5. Workflow Migration: All 4 workflows moved to backend/web/workflows/ with provider abstraction
+6. Cleanup: Old backend/web/aws/ directory fully removed
+
+File Structure After Refactoring:
+- backend/providers/base.py (abstract provider interface)
+- backend/providers/__init__.py (provider registry)
+- backend/providers/aws/provider.py (AWS implementation)
+- backend/providers/aws/__init__.py
+- backend/core/config.py (multi-provider configuration)
+- backend/web/workflows/__init__.py
+- backend/web/workflows/auth.py
+- backend/web/workflows/linux_qc_patching_prep.py
+- backend/web/workflows/linux_qc_patching_post.py
+- backend/web/workflows/sft_fixer.py
+- backend/main.py (updated router imports)
+
+Status: Ready for QA verification and testing
+
+=== END SESSION 2 ===
+
+=== QA VALIDATION COMPLETE ===
+
+Session 3 (QA Agent):
+Date: 2025-12-30
+
+Status: APPROVED
+
+Verification Results:
+- Subtasks: 12/12 completed
+- Provider interface: 6 abstract methods
+- AWS provider: All methods implemented
+- Workflow migration: 4 workflows decoupled
+- No AWS imports in workflows: PASS
+- Security review: PASS
+- Code quality: PASS
+
+=== END SESSION 3 ===
