@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Cloud Service Uptime - PCM-Ops Tools{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="display-5">Cloud Service Uptime</h1>
+            <p class="lead">Real-time status of cloud services across providers</p>
+        </div>
+    </div>
+
+    <!-- Service Status Card with HTMX -->
+    <div class="card border-primary mb-4">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">Cloud Services Status</h5>
+            <div>
+                <span class="badge bg-light text-dark" id="last-refresh"></span>
+                <div class="spinner-border spinner-border-sm text-light ms-2 htmx-indicator" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        </div>
+        <div
+            id="service-status"
+            hx-get="/api/service-status"
+            hx-trigger="load, every 30s"
+            hx-indicator=".htmx-indicator">
+            <div class="card-body">
+                <div class="d-flex justify-content-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Historical Uptime Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-secondary">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="card-title mb-0">Historical Uptime</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        Historical uptime data will be available in a future update.
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-header">AWS Services - Last 30 Days</div>
+                                <div class="card-body">
+                                    <p class="text-muted">Historical uptime charts will appear here</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-header">Azure Services - Last 30 Days</div>
+                                <div class="card-body">
+                                    <p class="text-muted">Historical uptime charts will appear here</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Incident History -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-info">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">Recent Incidents</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        Incident history will be available in a future update.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('htmx:afterSwap', function(event) {
+        if (event.detail.target.id === 'service-status') {
+            const now = new Date();
+            document.getElementById('last-refresh').textContent =
+                'Last updated: ' + now.toLocaleTimeString();
+        }
+    });
+</script>
+{% endblock %}

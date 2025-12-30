@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}Home - PCM-Ops Tools{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section">
+    <div class="container hero-content">
+        <div class="row justify-content-center">
+            <div class="col-lg-10 text-center">
+                <h2 class="hero-title">Multi-Cloud Operations Platform</h2>
+                <p class="hero-subtitle">Streamlined cloud operations and automation tools designed for enterprise-scale infrastructure management with professional-grade security.</p>
+                <div class="partnership-badge">
+                    Rackspace Technology × Texas DIR Partnership
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<main class="container my-4">
+    <div class="row">
+        <!-- AWS Tools Card -->
+        <div class="col-md-4">
+            <div class="tool-card">
+                <div class="tool-icon">
+                    <i class="bi bi-cloud"></i>
+                </div>
+                <h4 class="tool-title">AWS Operations</h4>
+                <p class="tool-description">Comprehensive AWS tools including Linux QC patching, SFT fixes, and secure multi-account script execution with detailed compliance reporting.</p>
+                <div class="mb-3">
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="status-indicator status-active"></div>
+                        <small class="text-secondary-custom">Linux QC Patching Tools</small>
+                    </div>
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="status-indicator status-active"></div>
+                        <small class="text-secondary-custom">SFT Fixer & Validation</small>
+                    </div>
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="status-indicator status-active"></div>
+                        <small class="text-secondary-custom">Multi-Account Operations</small>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <div class="status-indicator status-active"></div>
+                        <small class="text-secondary-custom">Secure Backend Execution</small>
+                    </div>
+                </div>
+                <a href="/aws/tools" class="btn btn-primary">
+                    <i class="bi bi-play-circle me-2"></i>Launch AWS Tools
+                </a>
+            </div>
+        </div>
+
+        <!-- Azure Tools Card -->
+        <div class="col-md-4">
+            <div class="tool-card">
+                <div class="tool-icon">
+                    <i class="bi bi-microsoft"></i>
+                </div>
+                <h4 class="tool-title">Azure Operations</h4>
+                <p class="tool-description">Azure resource management and automation tools for enterprise environments with integrated authentication and comprehensive monitoring capabilities.</p>
+                <div class="mb-3">
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="status-indicator status-inactive"></div>
+                        <small class="text-muted-custom">Authentication Management</small>
+                    </div>
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="status-indicator status-inactive"></div>
+                        <small class="text-muted-custom">Resource Management</small>
+                    </div>
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="status-indicator status-inactive"></div>
+                        <small class="text-muted-custom">Automation Tools</small>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <div class="status-indicator status-warning"></div>
+                        <small class="text-muted-custom">Coming Soon</small>
+                    </div>
+                </div>
+                <button class="btn btn-secondary" disabled>
+                    <i class="bi bi-clock me-2"></i>Preview Mode
+                </button>
+            </div>
+        </div>
+
+        <!-- GCP Tools Card -->
+        <div class="col-md-4">
+            <div class="tool-card">
+                <div class="tool-icon">
+                    <i class="bi bi-google"></i>
+                </div>
+                <h4 class="tool-title">Google Cloud Operations</h4>
+                <p class="tool-description">Google Cloud Platform management tools for project administration, service operations, and automated infrastructure management across GCP environments.</p>
+                <div class="mb-3">
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="status-indicator status-inactive"></div>
+                        <small class="text-muted-custom">Project Management</small>
+                    </div>
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="status-indicator status-inactive"></div>
+                        <small class="text-muted-custom">Service Operations</small>
+                    </div>
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="status-indicator status-inactive"></div>
+                        <small class="text-muted-custom">Infrastructure Automation</small>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <div class="status-indicator status-warning"></div>
+                        <small class="text-muted-custom">Coming Soon</small>
+                    </div>
+                </div>
+                <button class="btn btn-success" disabled>
+                    <i class="bi bi-clock me-2"></i>Preview Mode
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ServiceNow Integration Section -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="tool-card">
+                <div class="row align-items-center">
+                    <div class="col-md-2 text-center">
+                        <div class="tool-icon mx-auto" style="width: 64px; height: 64px; font-size: 2rem;">
+                            <i class="bi bi-diagram-3"></i>
+                        </div>
+                    </div>
+                    <div class="col-md-7">
+                        <h4 class="tool-title">ServiceNow Integration</h4>
+                        <p class="tool-description mb-3">Integrate cloud operations with ServiceNow for change management, CMDB updates, and incident tracking across all cloud platforms.</p>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="bi bi-check-circle-fill text-success me-2"></i>
+                                    <small class="text-secondary-custom">Automatic CMDB updates</small>
+                                </div>
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="bi bi-check-circle-fill text-success me-2"></i>
+                                    <small class="text-secondary-custom">Change request management</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="bi bi-check-circle-fill text-success me-2"></i>
+                                    <small class="text-secondary-custom">Incident integration</small>
+                                </div>
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="bi bi-clock text-warning me-2"></i>
+                                    <small class="text-muted-custom">Full integration coming soon</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <button class="btn btn-secondary" disabled>
+                            <i class="bi bi-tools me-2"></i>Preview Integration
+                        </button>
+                        <div class="mt-2">
+                            <small class="text-muted-custom">Available in future release</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</main>
+
+{% block extra_js %}
+<script>
+// Add subtle animations to cards on scroll
+document.addEventListener('DOMContentLoaded', function() {
+    const observerOptions = {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('slide-up');
+            }
+        });
+    }, observerOptions);
+
+    document.querySelectorAll('.tool-card').forEach(card => {
+        observer.observe(card);
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}

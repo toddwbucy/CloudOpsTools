@@ -1,0 +1,233 @@
+/**
+ * CloudOpsTools Custom Theme
+ * Brand colors and theme variables for the CloudOpsTools platform
+ */
+
+:root {
+    /* CloudOpsTools Brand Colors */
+    --brand-primary: #0066cc;
+    --brand-secondary: #004d99;
+    --brand-accent: #00aaff;
+
+    /* Light theme colors */
+    --bg-primary: #ffffff;
+    --bg-secondary: #f8f9fa;
+    --bg-tertiary: #e9ecef;
+    --text-primary: #212529;
+    --text-secondary: #6c757d;
+    --text-muted: #adb5bd;
+    --border-color: #dee2e6;
+
+    /* Component colors */
+    --header-bg: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary));
+    --footer-bg: #1a1a2e;
+    --navbar-bg: var(--bg-secondary);
+    --card-bg: var(--bg-primary);
+    --dropdown-bg: var(--bg-primary);
+
+    /* Status colors */
+    --success: #28a745;
+    --warning: #ffc107;
+    --danger: #dc3545;
+    --info: #17a2b8;
+}
+
+/* Dark theme */
+[data-theme="dark"] {
+    --bg-primary: #1a1a2e;
+    --bg-secondary: #16213e;
+    --bg-tertiary: #0f3460;
+    --text-primary: #e9ecef;
+    --text-secondary: #adb5bd;
+    --text-muted: #6c757d;
+    --border-color: #343a40;
+
+    /* Component colors for dark theme */
+    --navbar-bg: var(--bg-secondary);
+    --card-bg: var(--bg-secondary);
+    --dropdown-bg: var(--bg-secondary);
+}
+
+/* Base body styling */
+body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Header styling */
+.main-header {
+    background: var(--header-bg);
+    padding: 1.5rem 0;
+    color: white;
+}
+
+.main-brand {
+    font-size: 2rem;
+    font-weight: bold;
+    margin: 0;
+}
+
+.client-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 1rem;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* Navigation styling */
+.navbar {
+    background-color: var(--navbar-bg) !important;
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.3s ease;
+}
+
+.navbar .nav-link {
+    color: var(--text-primary) !important;
+    transition: color 0.2s ease;
+}
+
+.navbar .nav-link:hover,
+.navbar .nav-link.active {
+    color: var(--brand-primary) !important;
+}
+
+.navbar .dropdown-menu {
+    background-color: var(--dropdown-bg);
+    border-color: var(--border-color);
+}
+
+.navbar .dropdown-item {
+    color: var(--text-primary);
+}
+
+.navbar .dropdown-item:hover {
+    background-color: var(--bg-tertiary);
+    color: var(--brand-primary);
+}
+
+/* Theme switcher button */
+.theme-switcher {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.theme-switcher:hover {
+    background-color: var(--bg-tertiary);
+}
+
+.theme-text {
+    font-size: 0.875rem;
+}
+
+/* Footer styling */
+.footer {
+    background-color: var(--footer-bg);
+    color: white;
+    padding: 2rem 0;
+    margin-top: auto;
+}
+
+.footer h5 {
+    color: var(--brand-accent);
+    margin-bottom: 0.75rem;
+}
+
+/* Card styling */
+.card {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.card-header {
+    background-color: var(--bg-secondary);
+    border-bottom-color: var(--border-color);
+}
+
+/* Form controls */
+.form-control,
+.form-select {
+    background-color: var(--bg-primary);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+.form-control:focus,
+.form-select:focus {
+    background-color: var(--bg-primary);
+    border-color: var(--brand-primary);
+    color: var(--text-primary);
+    box-shadow: 0 0 0 0.2rem rgba(0, 102, 204, 0.25);
+}
+
+[data-theme="dark"] .form-control,
+[data-theme="dark"] .form-select {
+    background-color: var(--bg-tertiary);
+}
+
+[data-theme="dark"] .form-control:focus,
+[data-theme="dark"] .form-select:focus {
+    background-color: var(--bg-tertiary);
+}
+
+/* Alert customizations */
+.alert {
+    border-radius: 0.5rem;
+}
+
+/* Button brand variants */
+.btn-brand {
+    background-color: var(--brand-primary);
+    border-color: var(--brand-primary);
+    color: white;
+}
+
+.btn-brand:hover {
+    background-color: var(--brand-secondary);
+    border-color: var(--brand-secondary);
+    color: white;
+}
+
+/* Table styling for dark theme */
+[data-theme="dark"] .table {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .table-striped tbody tr:nth-of-type(odd) {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .table-hover tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.075);
+}
+
+/* Scrollbar styling for dark theme */
+[data-theme="dark"] ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+    background: var(--text-muted);
+    border-radius: 4px;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
+}

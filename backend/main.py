@@ -13,6 +13,9 @@ Example usage:
     http://localhost:8500/redoc
 """
 
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
@@ -20,15 +23,27 @@ from starlette.middleware.sessions import SessionMiddleware
 from backend.core.config import settings
 from backend.web.workflows import auth, linux_qc_patching_prep, linux_qc_patching_post, sft_fixer
 
+# Configure logger with CloudOpsTools namespace
+logger = logging.getLogger("cloudopstools.main")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan management"""
+    logger.info(f"Starting {settings.APP_NAME} v{settings.VERSION}")
+    yield
+    logger.info(f"Shutting down {settings.APP_NAME}")
+
 # =============================================================================
 # Application Setup
 # =============================================================================
 
 app = FastAPI(
-    title="CloudOpsTools API",
+    title=f"{settings.APP_NAME} API",
     description="Provider-agnostic cloud operations tools for managing instances, "
     "executing scripts, and running QC workflows across AWS, Azure, and GCP.",
-    version="1.0.0",
+    version=settings.VERSION,
+    lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
@@ -39,12 +54,11 @@ app = FastAPI(
 # =============================================================================
 
 # Session middleware for credential storage
-# In production, use a secure secret key from environment
 app.add_middleware(
     SessionMiddleware,
-    secret_key=settings.SESSION_SECRET_KEY if hasattr(settings, "SESSION_SECRET_KEY") else "dev-secret-key-change-in-production",
+    secret_key=settings.SECRET_KEY,
     session_cookie="cloudopstools_session",
-    max_age=3600,  # 1 hour session lifetime
+    max_age=settings.SESSION_LIFETIME_MINUTES * 60,
     same_site="lax",
     https_only=False,  # Set to True in production
 )
@@ -52,7 +66,7 @@ app.add_middleware(
 # CORS middleware for frontend access
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

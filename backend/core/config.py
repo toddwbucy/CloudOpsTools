@@ -15,8 +15,10 @@ Example usage:
     aws_creds = settings.get_provider_credentials("aws", "com")
 """
 
-from typing import Any, Dict, Optional
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -34,6 +36,39 @@ class Settings(BaseSettings):
         extra="ignore",  # Ignore extra env vars not defined in the model
     )
 
+    # Application settings
+    APP_NAME: str = "CloudOpsTools"
+    VERSION: str = "2.0.0"
+    ENVIRONMENT: str = "development"
+    DEBUG: bool = True
+    DEV_MODE: bool = False  # Set via environment variable, enables mock AWS operations
+
+    # Security
+    SECRET_KEY: str = "your-secret-key-here-change-in-production"
+
+    # Database
+    DATABASE_URL: str = "sqlite:///./data/cloudopstools.db"
+    SQLITE_DATABASE_URI: str = (
+        "sqlite:///./data/cloudopstools.db"  # Alias for compatibility
+    )
+
+    # Server settings
+    HOST: str = "0.0.0.0"
+    PORT: int = 8500
+    # CORS - Configure allowed origins via environment variable
+    # Example: CORS_ORIGINS='["https://example.com", "https://app.example.com"]'
+    CORS_ORIGINS: List[str] = Field(
+        default=["http://localhost:8500", "http://localhost:3000"],
+        description="List of allowed CORS origins. Can be overridden via CORS_ORIGINS env var as JSON array"
+    )
+
+    # Frontend settings (now integrated)
+    UPLOAD_FOLDER: Path = Path("./uploads")
+    MAX_CONTENT_LENGTH: int = 10 * 1024 * 1024  # 10MB
+
+    # AWS settings
+    AWS_DEFAULT_REGION: str = "us-east-1"
+
     # AWS Commercial environment credentials (backward compatible)
     AWS_ACCESS_KEY_ID_COM: Optional[str] = None
     AWS_SECRET_ACCESS_KEY_COM: Optional[str] = None
@@ -41,6 +76,18 @@ class Settings(BaseSettings):
     # AWS GovCloud environment credentials (backward compatible)
     AWS_ACCESS_KEY_ID_GOV: Optional[str] = None
     AWS_SECRET_ACCESS_KEY_GOV: Optional[str] = None
+    AWS_SESSION_TOKEN_COM: Optional[str] = None
+    AWS_SESSION_TOKEN_GOV: Optional[str] = None
+
+    # Session settings
+    SESSION_LIFETIME_MINUTES: int = 30
+
+    # API settings (for any external integrations)
+    API_TIMEOUT: int = 30
+
+    # Script execution settings
+    MAX_CONCURRENT_EXECUTIONS: int = 5
+    EXECUTION_TIMEOUT: int = 1800  # 30 minutes
 
     # Default provider when not specified in session
     DEFAULT_PROVIDER: str = "aws"
