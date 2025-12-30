@@ -1,0 +1,22 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    devDependencies:
+      '@stagewise/toolbar':
+        specifier: ^0.3.0
+        version: 0.3.0
+
+packages:
+
+  '@stagewise/toolbar@0.3.0':
+    resolution: {integrity: sha512-NqbFwTAVukmxrJ6euGNZ9C/T9HTXx3/vkufsBqsjm1VC9XEo57JXrLMX4M62ZPdVJHFfe40B2nOVHAaOSKIAdw==}
+
+snapshots:
+
+  '@stagewise/toolbar@0.3.0': {}

@@ -1,0 +1,460 @@
+{% extends "base.html" %}
+
+{% block title %}AWS Tools - PCM-Ops Tools{% endblock %}
+
+{% block content %}
+<!-- Hero Section for AWS Tools -->
+<section class="hero-section">
+    <div class="container hero-content">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h2 class="hero-title">
+                    <i class="bi bi-cloud me-3"></i>AWS Operations Center
+                </h2>
+                <p class="hero-subtitle">Professional-grade AWS tools for enterprise infrastructure management with secure, controlled operations across multiple accounts.</p>
+                <div class="partnership-badge">
+                    Enterprise AWS Management Platform
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="status-dashboard">
+                    <h5 class="mb-3" style="color: var(--accent);"><i class="bi bi-shield-check me-2"></i>Authentication Status</h5>
+                    {% if com_credentials and gov_credentials %}
+                    <div class="status-item">
+                        <div class="status-icon status-healthy">
+                            <i class="bi bi-check-circle-fill"></i>
+                        </div>
+                        <div>
+                            <strong style="color: var(--text-primary);">COM & GOV Environments</strong><br>
+                            <small style="color: var(--text-muted);">All credentials active</small>
+                        </div>
+                    </div>
+                    {% elif com_credentials %}
+                    <div class="status-item">
+                        <div class="status-icon status-healthy">
+                            <i class="bi bi-check-circle-fill"></i>
+                        </div>
+                        <div>
+                            <strong style="color: var(--text-primary);">Commercial Environment</strong><br>
+                            <small style="color: var(--text-muted);">Ready for operations</small>
+                        </div>
+                    </div>
+                    {% elif gov_credentials %}
+                    <div class="status-item">
+                        <div class="status-icon status-healthy">
+                            <i class="bi bi-check-circle-fill"></i>
+                        </div>
+                        <div>
+                            <strong style="color: var(--text-primary);">GovCloud Environment</strong><br>
+                            <small style="color: var(--text-muted);">Ready for operations</small>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="status-item warning">
+                        <div class="status-icon status-warning">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                        </div>
+                        <div>
+                            <strong style="color: var(--text-primary);">Authentication Required</strong><br>
+                            <small style="color: var(--text-muted);">Configure AWS credentials to proceed</small>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content -->
+<main class="container my-5">
+    <!-- Quick Actions Bar -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body py-3">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <h6 class="mb-1 text-primary-custom">
+                                <i class="bi bi-lightning-fill me-2"></i>Quick Actions
+                            </h6>
+                            <small class="text-secondary-custom">Manage your AWS environment</small>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex gap-2 justify-content-md-end">
+                                <a href="/aws" class="btn btn-sm btn-secondary">
+                                    <i class="bi bi-key me-1"></i>Credentials
+                                </a>
+                                <a href="/" class="btn btn-sm btn-primary">
+                                    <i class="bi bi-arrow-left me-1"></i>Home
+                                </a>
+                                {% if com_credentials or gov_credentials %}
+                                <button class="btn btn-sm btn-danger" onclick="clearAllCredentials()">
+                                    <i class="bi bi-door-open me-1"></i>Sign Out
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Available Tools -->
+    <div class="row">
+        <!-- Linux QC Patching Prep Tool -->
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="tool-card">
+                <div class="tool-icon">
+                    <i class="bi bi-shield-check"></i>
+                </div>
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <h4 class="tool-title mb-0">Linux QC Patching Prep</h4>
+                    <span class="badge bg-success">Available</span>
+                </div>
+                <p class="tool-description">Prepare Linux systems for patching with comprehensive QC checks and kernel staging across multiple AWS accounts.</p>
+                
+                <h6 class="text-primary-custom mb-2">Features:</h6>
+                <div class="mb-3">
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="bi bi-check-circle text-success me-2" style="font-size: 0.8rem;"></i>
+                        <small class="text-secondary-custom">Initial QC report generation</small>
+                    </div>
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="bi bi-check-circle text-success me-2" style="font-size: 0.8rem;"></i>
+                        <small class="text-secondary-custom">Kernel version staging</small>
+                    </div>
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="bi bi-check-circle text-success me-2" style="font-size: 0.8rem;"></i>
+                        <small class="text-secondary-custom">Multi-kernel support</small>
+                    </div>
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="bi bi-check-circle text-success me-2" style="font-size: 0.8rem;"></i>
+                        <small class="text-secondary-custom">Automated patch script creation</small>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="d-flex align-items-center">
+                        <div class="status-indicator {{ 'status-active' if (com_credentials or gov_credentials) else 'status-error' }}"></div>
+                        <small class="text-muted-custom">AWS Credentials {{ 'Ready' if (com_credentials or gov_credentials) else 'Required' }}</small>
+                    </div>
+                </div>
+
+                {% if com_credentials or gov_credentials %}
+                    <a href="/aws/linux-qc-patching-prep" class="btn btn-primary">
+                        <i class="bi bi-play-circle me-2"></i>Launch QC Prep
+                    </a>
+                {% else %}
+                    <button class="btn btn-primary" disabled>
+                        <i class="bi bi-lock me-2"></i>Authenticate First
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Linux QC Patching Post Tool -->
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="tool-card">
+                <div class="tool-icon">
+                    <i class="bi bi-check2-square"></i>
+                </div>
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <h4 class="tool-title mb-0">Linux QC Patching Post</h4>
+                    <span class="badge bg-success">Available</span>
+                </div>
+                <p class="tool-description">Post-patching validation and service verification for Linux systems with comprehensive health checks.</p>
+                
+                <h6 class="text-primary-custom mb-2">Features:</h6>
+                <div class="mb-3">
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="bi bi-check-circle text-success me-2" style="font-size: 0.8rem;"></i>
+                        <small class="text-secondary-custom">Post-patch validation</small>
+                    </div>
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="bi bi-check-circle text-success me-2" style="font-size: 0.8rem;"></i>
+                        <small class="text-secondary-custom">Service health checks</small>
+                    </div>
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="bi bi-check-circle text-success me-2" style="font-size: 0.8rem;"></i>
+                        <small class="text-secondary-custom">Reboot verification</small>
+                    </div>
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="bi bi-check-circle text-success me-2" style="font-size: 0.8rem;"></i>
+                        <small class="text-secondary-custom">Agent status validation</small>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="d-flex align-items-center">
+                        <div class="status-indicator {{ 'status-active' if (com_credentials or gov_credentials) else 'status-error' }}"></div>
+                        <small class="text-muted-custom">AWS Credentials {{ 'Ready' if (com_credentials or gov_credentials) else 'Required' }}</small>
+                    </div>
+                </div>
+
+                {% if com_credentials or gov_credentials %}
+                    <a href="/aws/linux-qc-patching-post" class="btn btn-primary">
+                        <i class="bi bi-play-circle me-2"></i>Launch QC Post
+                    </a>
+                {% else %}
+                    <button class="btn btn-primary" disabled>
+                        <i class="bi bi-lock me-2"></i>Authenticate First
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- SFT Fixer Tool -->
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="tool-card">
+                <div class="tool-icon">
+                    <i class="bi bi-wrench-adjustable"></i>
+                </div>
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <h4 class="tool-title mb-0">SFT Fixer</h4>
+                    <span class="badge bg-success">Available</span>
+                </div>
+                <p class="tool-description">Detect and fix ScaleFT (SFT) agent issues on EC2 instances with automated remediation workflows.</p>
+                
+                <h6 class="text-primary-custom mb-2">Features:</h6>
+                <div class="mb-3">
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="bi bi-check-circle text-success me-2" style="font-size: 0.8rem;"></i>
+                        <small class="text-secondary-custom">SFT agent detection</small>
+                    </div>
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="bi bi-check-circle text-success me-2" style="font-size: 0.8rem;"></i>
+                        <small class="text-secondary-custom">Enrollment token management</small>
+                    </div>
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="bi bi-check-circle text-success me-2" style="font-size: 0.8rem;"></i>
+                        <small class="text-secondary-custom">Service restart automation</small>
+                    </div>
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="bi bi-check-circle text-success me-2" style="font-size: 0.8rem;"></i>
+                        <small class="text-secondary-custom">Configuration repair</small>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="d-flex align-items-center">
+                        <div class="status-indicator {{ 'status-active' if (com_credentials or gov_credentials) else 'status-error' }}"></div>
+                        <small class="text-muted-custom">AWS Credentials {{ 'Ready' if (com_credentials or gov_credentials) else 'Required' }}</small>
+                    </div>
+                </div>
+
+                {% if com_credentials or gov_credentials %}
+                    <a href="/aws/sft-fixer" class="btn btn-primary">
+                        <i class="bi bi-tools me-2"></i>Launch SFT Fixer
+                    </a>
+                {% else %}
+                    <button class="btn btn-primary" disabled>
+                        <i class="bi bi-lock me-2"></i>Authenticate First
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Future Tools Section -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <h3 class="text-primary-custom mb-4">
+                <i class="bi bi-rocket-fill me-2"></i>Coming Soon
+            </h3>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- EC2 Manager Tool -->
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="tool-card" style="opacity: 0.7;">
+                <div class="tool-icon" style="background: linear-gradient(135deg, var(--secondary), var(--tx-gray));">
+                    <i class="bi bi-server"></i>
+                </div>
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <h4 class="tool-title mb-0">EC2 Manager</h4>
+                    <span class="badge bg-warning text-dark">Coming Soon</span>
+                </div>
+                <p class="tool-description">Manage EC2 instances across multiple accounts with bulk operations and automation.</p>
+                
+                <div class="mb-3">
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="bi bi-clock text-warning me-2" style="font-size: 0.8rem;"></i>
+                        <small class="text-muted-custom">Bulk instance operations</small>
+                    </div>
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="bi bi-clock text-warning me-2" style="font-size: 0.8rem;"></i>
+                        <small class="text-muted-custom">Automated scaling</small>
+                    </div>
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="bi bi-clock text-warning me-2" style="font-size: 0.8rem;"></i>
+                        <small class="text-muted-custom">Security group management</small>
+                    </div>
+                </div>
+
+                <button class="btn btn-secondary" disabled>
+                    <i class="bi bi-clock me-2"></i>In Development
+                </button>
+            </div>
+        </div>
+
+        <!-- S3 Manager Tool -->
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="tool-card" style="opacity: 0.7;">
+                <div class="tool-icon" style="background: linear-gradient(135deg, var(--secondary), var(--tx-gray));">
+                    <i class="bi bi-cloud-arrow-up"></i>
+                </div>
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <h4 class="tool-title mb-0">S3 Manager</h4>
+                    <span class="badge bg-warning text-dark">Coming Soon</span>
+                </div>
+                <p class="tool-description">Manage S3 buckets and objects with bulk operations and lifecycle management.</p>
+                
+                <div class="mb-3">
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="bi bi-clock text-warning me-2" style="font-size: 0.8rem;"></i>
+                        <small class="text-muted-custom">Bulk object operations</small>
+                    </div>
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="bi bi-clock text-warning me-2" style="font-size: 0.8rem;"></i>
+                        <small class="text-muted-custom">Lifecycle policy management</small>
+                    </div>
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="bi bi-clock text-warning me-2" style="font-size: 0.8rem;"></i>
+                        <small class="text-muted-custom">Cross-region replication</small>
+                    </div>
+                </div>
+
+                <button class="btn btn-secondary" disabled>
+                    <i class="bi bi-clock me-2"></i>In Development
+                </button>
+            </div>
+        </div>
+
+        <!-- IAM Analyzer Tool -->
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="tool-card" style="opacity: 0.7;">
+                <div class="tool-icon" style="background: linear-gradient(135deg, var(--secondary), var(--tx-gray));">
+                    <i class="bi bi-shield-check"></i>
+                </div>
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <h4 class="tool-title mb-0">IAM Analyzer</h4>
+                    <span class="badge bg-warning text-dark">Coming Soon</span>
+                </div>
+                <p class="tool-description">Analyze IAM policies, roles, and permissions across multiple AWS accounts.</p>
+                
+                <div class="mb-3">
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="bi bi-clock text-warning me-2" style="font-size: 0.8rem;"></i>
+                        <small class="text-muted-custom">Policy analysis</small>
+                    </div>
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="bi bi-clock text-warning me-2" style="font-size: 0.8rem;"></i>
+                        <small class="text-muted-custom">Permission mapping</small>
+                    </div>
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="bi bi-clock text-warning me-2" style="font-size: 0.8rem;"></i>
+                        <small class="text-muted-custom">Security recommendations</small>
+                    </div>
+                </div>
+
+                <button class="btn btn-secondary" disabled>
+                    <i class="bi bi-clock me-2"></i>In Development
+                </button>
+            </div>
+        </div>
+    </div>
+</main>
+
+{% block extra_js %}
+<script>
+async function clearAllCredentials() {
+    if (!confirm('Sign out and clear all AWS credentials?')) return;
+    
+    try {
+        const response = await fetch('/aws/clear-credentials', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (response.ok) {
+            // Show success toast
+            if (window.showToast) {
+                window.showToast('Credentials cleared successfully', 'success');
+            }
+            // Redirect after brief delay
+            setTimeout(() => {
+                window.location.href = '/aws';
+            }, 1000);
+        } else {
+            const errorText = await response.text();
+            let errorMessage = 'Failed to clear credentials';
+            try {
+                const errorJson = JSON.parse(errorText);
+                if (errorJson.detail) {
+                    errorMessage = errorJson.detail;
+                }
+            } catch (e) {
+                if (errorText) {
+                    errorMessage = errorText;
+                }
+            }
+            console.error('Clear credentials error:', errorMessage);
+            if (window.showToast) {
+                window.showToast('Error: ' + errorMessage, 'danger');
+            } else {
+                alert('Error: ' + errorMessage);
+            }
+        }
+    } catch (error) {
+        console.error('Network error:', error);
+        if (window.showToast) {
+            window.showToast('Network error: ' + error.message, 'danger');
+        } else {
+            alert('Network error: ' + error.message);
+        }
+    }
+}
+
+// Add breathing effect to status icons and tool animations
+document.addEventListener('DOMContentLoaded', function() {
+    const statusIcons = document.querySelectorAll('.status-icon');
+    statusIcons.forEach(icon => {
+        const delay = Math.random() * 3000;
+        setTimeout(() => {
+            setInterval(() => {
+                icon.style.transition = 'transform 0.3s ease';
+                icon.style.transform = 'scale(1.05)';
+                setTimeout(() => {
+                    icon.style.transform = 'scale(1)';
+                }, 300);
+            }, 5000);
+        }, delay);
+    });
+
+    // Intersection observer for tool card animations
+    const observerOptions = {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('slide-up');
+            }
+        });
+    }, observerOptions);
+
+    document.querySelectorAll('.tool-card').forEach(card => {
+        observer.observe(card);
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,15 @@
+PCM-Ops Tools Test Run Summary
+=============================
+
+Date: Sun Aug 24 09:02:59 AM CDT 2025
+Test Type: integration
+Exit Code: 1
+Coverage Enabled: No
+Parallel Execution: No
+
+Command Executed:
+poetry run pytest -q -m integration tests/integration/
+
+Reports Generated:
+
+
