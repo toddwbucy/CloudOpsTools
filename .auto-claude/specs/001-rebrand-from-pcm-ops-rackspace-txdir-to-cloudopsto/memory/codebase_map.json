@@ -14,7 +14,12 @@
       "description": "Logo files (7 total: 4 Rackspace + 3 DIR) were in backend/static/img/logos/ directory, not backend/static/images/. These files were already removed from the current branch - the directory no longer exists. The base.html template was already updated in subtask-2-1 to remove logo references and use CloudOpsTools text branding instead.",
       "category": "file-structure",
       "discovered_at": "2025-12-30T19:38:52.289783+00:00"
+    },
+    "backend/web/aws/linux_qc_patching_prep.py": {
+      "description": "File does not exist in this codebase. The backend/web/aws/ directory structure was referenced in the spec but is not present in this project. The spec appears to have been generated from a different version or a larger repository. No S3 bucket URL updates needed since the file doesn't exist.",
+      "category": "missing_file",
+      "discovered_at": "2025-12-30T19:44:58.409744+00:00"
     }
   },
-  "last_updated": "2025-12-30T19:38:52.289796+00:00"
+  "last_updated": "2025-12-30T19:44:58.409759+00:00"
 }
