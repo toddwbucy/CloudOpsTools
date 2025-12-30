@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}PCM-Ops Tools{% endblock %}</title>
+    <title>{% block title %}CloudOpsTools{% endblock %}</title>
     <link rel="stylesheet" href="/static/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link rel="stylesheet" href="/static/css/custom-theme.css">
@@ -16,8 +16,7 @@
         <div class="container">
             <div class="brand-section text-center">
                 <h1 class="main-brand">
-                    <span class="rackspace-accent">Rackspace</span> 
-                    <span style="color: var(--rs-teal-bright);">Tx-DIR</span> Public Cloud Manager Operations
+                    <span style="color: var(--brand-primary);">CloudOpsTools</span>
                 </h1>
                 <div class="client-badge">
                     <i class="bi bi-building"></i> Multi-Cloud Operations Platform
@@ -94,9 +93,9 @@
                 </ul>
                 <ul class="navbar-nav">
                     <li class="nav-item">
-                        <button class="btn btn-link nav-link theme-switcher" 
-                                id="theme-toggle" 
-                                role="switch" 
+                        <button class="btn btn-link nav-link theme-switcher"
+                                id="theme-toggle"
+                                role="switch"
                                 aria-checked="true"
                                 aria-label="Toggle theme, currently Dark Mode"
                                 title="Toggle theme">
@@ -132,22 +131,18 @@
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Partnership Footer -->
+    <!-- Footer -->
     <footer class="footer">
         <div class="container">
             <div class="row">
                 <div class="col-md-8">
-                    <h5>Rackspace Technology</h5>
+                    <h5>CloudOpsTools</h5>
                     <p class="mb-2">Empowering digital transformation through expert cloud solutions</p>
-                    <small style="color: rgba(255,255,255,0.8);">Partnered with Texas Department of Information Resources</small>
+                    <small style="color: rgba(255,255,255,0.8);">Multi-Cloud Operations Platform</small>
                 </div>
                 <div class="col-md-4">
-                    <div class="partnership-logos d-flex align-items-center justify-content-end gap-3">
-                        <img src="/static/img/logos/Rackspace_Technology_Logo_RGB_WHT.svg" 
-                             alt="Rackspace Technology" style="height: 35px;">
-                        <div style="color: var(--rs-teal-bright);">×</div>
-                        <img src="/static/img/logos/dir_banner_embedded.svg" 
-                             alt="Texas DIR" style="height: 35px;">
+                    <div class="d-flex align-items-center justify-content-end gap-3">
+                        <span style="color: var(--brand-primary); font-weight: bold;">CloudOpsTools</span>
                     </div>
                 </div>
             </div>
@@ -159,7 +154,7 @@
     <script src="/static/js/theme-switcher.js"></script>
     <script src="/static/js/utils.js"></script>
     <script src="/static/js/main.js"></script>
-    
+
     <!-- Toast notification utility -->
     <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 11">
         <div id="liveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
@@ -170,16 +165,16 @@
             <div class="toast-body"></div>
         </div>
     </div>
-    
+
     <script>
     function showToast(message, type = 'info') {
         const toast = document.getElementById('liveToast');
         const toastBody = toast.querySelector('.toast-body');
         const toastHeader = toast.querySelector('.toast-header');
-        
+
         // Set message
         toastBody.textContent = message;
-        
+
         // Set type styling
         toast.className = 'toast';
         if (type === 'success') {
@@ -195,7 +190,7 @@
             toast.classList.add('bg-info', 'text-white');
             toastHeader.classList.add('bg-info', 'text-white');
         }
-        
+
         // Show toast
         const bsToast = new bootstrap.Toast(toast);
         bsToast.show();
@@ -208,7 +203,7 @@
     <!-- Stagewise Toolbar Integration -->
     <script>
       (function(w,d,s,o,f,js,fjs){w['Stagewise']=o;w[o]=w[o]||function(){(w[o].q=w[o].q||[]).push(arguments)};js=d.createElement(s),fjs=d.getElementsByTagName(s)[0];js.id=o;js.src=f;js.async=1;fjs.parentNode.insertBefore(js,fjs);}(window,document,'script','SW','https://script.stagewise.io/v1/sw.js'));
-      SW('config', { projectId: 'pcm-ops-tools' });
+      SW('config', { projectId: 'cloudopstools' });
     </script>
 </body>
 </html>

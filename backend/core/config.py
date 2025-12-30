@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     """Application settings"""
 
     # Application settings
-    APP_NAME: str = "PCM-Ops Tools"
+    APP_NAME: str = "CloudOpsTools"
     VERSION: str = "2.0.0"
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
@@ -58,9 +58,9 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "your-secret-key-here-change-in-production"
 
     # Database
-    DATABASE_URL: str = "sqlite:///./data/pcm_ops_tools.db"
+    DATABASE_URL: str = "sqlite:///./data/cloudopstools.db"
     SQLITE_DATABASE_URI: str = (
-        "sqlite:///./data/pcm_ops_tools.db"  # Alias for compatibility
+        "sqlite:///./data/cloudopstools.db"  # Alias for compatibility
     )
 
     # Server settings
@@ -130,7 +130,7 @@ class Settings(BaseSettings):
         self.UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
         # Ensure data directory exists
         Path("./data").mkdir(parents=True, exist_ok=True)
-        
+
         # Apply Phase 1 security fixes if feature flag is enabled
         self._apply_phase1_security_fixes()
 
@@ -171,13 +171,13 @@ class Settings(BaseSettings):
             environments.append(AWSEnvironment.GOV)
 
         return environments
-    
+
     def _apply_phase1_security_fixes(self):
         """Apply Phase 1 security fixes when feature flags are enabled"""
         try:
             # Import here to avoid circular imports
             from backend.core.feature_flags import is_feature_enabled
-            
+
             # Fix 1: Secure SECRET_KEY handling
             if is_feature_enabled('NEW_SECRET_KEY_HANDLING'):
                 from backend.core.security import get_or_create_secret_key
@@ -189,7 +189,7 @@ class Settings(BaseSettings):
                     logging.getLogger(__name__).error(f"Failed to apply secure SECRET_KEY: {e}")
                     # Keep the existing key but warn
                     logging.getLogger(__name__).warning("Continuing with existing SECRET_KEY (security risk)")
-        
+
         except ImportError:
             # Feature flags not available during early initialization
             pass

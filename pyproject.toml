@@ -1,8 +1,8 @@
 [tool.poetry]
-name = "pcm-ops-tools"
+name = "cloudopstools"
 version = "0.1.0"
-description = "PCM-Ops Tools - A comprehensive platform for running operations across multiple cloud providers"
-authors = ["PCM-Ops Team"]
+description = "CloudOpsTools - A comprehensive platform for running operations across multiple cloud providers"
+authors = ["CloudOpsTools Team"]
 license = "MIT"
 readme = "README.md"
 packages = [{include = "backend"}]
