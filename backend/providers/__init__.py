@@ -19,13 +19,13 @@ Example usage:
 
 from typing import Any, Dict, List, Type
 
+from backend.providers.aws import AWSProvider
 from backend.providers.base import ProviderBase
 
 # Provider registry mapping provider names to their implementation classes
 # New providers are registered here as they are implemented
 _PROVIDER_REGISTRY: Dict[str, Type[ProviderBase]] = {
-    # Providers are registered during their respective implementation phases
-    # "aws": AWSProvider,  # Registered in subtask-2-2
+    "aws": AWSProvider,
     # Future: "azure": AzureProvider, "gcp": GCPProvider
 }
 
@@ -104,8 +104,9 @@ def is_provider_registered(provider_name: str) -> bool:
     return provider_name in _PROVIDER_REGISTRY
 
 
-# Re-export ProviderBase for convenience
+# Re-export base classes and providers for convenience
 __all__ = [
+    "AWSProvider",
     "ProviderBase",
     "get_provider",
     "register_provider",
