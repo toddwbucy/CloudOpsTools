@@ -169,6 +169,163 @@ class TestDataEncryption:
                 # Cleanup
                 SessionStore.clear(test_key)
 
+    def test_credential_decryption_roundtrip_via_session_store(self, test_settings, db_session):
+        """Test full round-trip: encrypt -> store -> retrieve -> decrypt returns original value"""
+        from backend.core.utils.session_store import SessionStore
+        from backend.db.models.session_store import SessionData
+        from sqlalchemy import select
+
+        # Original plaintext credentials with all common fields
+        original_credentials = {
+            "access_key": "AKIAIOSFODNN7EXAMPLE",
+            "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            "session_token": "IQoJb3JpZ2luX2VjEJr...test-token...",
+            "environment": "com",
+            "expiration": "2025-01-01T12:00:00Z",
+        }
+
+        test_key = "credentials:roundtrip_test_session"
+
+        # Mock the feature flag to be enabled for the entire test
+        with patch('backend.core.utils.session_store.is_feature_enabled', return_value=True):
+            # Step 1: Store credentials (internally encrypts)
+            SessionStore.set(test_key, original_credentials)
+
+            # Step 2: Verify stored data is encrypted (not plaintext)
+            row = db_session.scalar(
+                select(SessionData).where(SessionData.key == test_key)
+            )
+            assert row is not None, "Credentials should be stored in database"
+
+            stored_data = row.data
+            assert isinstance(stored_data, str), "Stored data should be encrypted string"
+            assert stored_data.startswith("gAAAAA"), "Should be Fernet encrypted format"
+
+            # Verify plaintext is NOT in stored data
+            for key, value in original_credentials.items():
+                assert value not in str(stored_data), \
+                    f"Plaintext '{key}' should NOT be in encrypted storage"
+
+            # Step 3: Retrieve credentials (internally decrypts)
+            retrieved_credentials = SessionStore.get(test_key)
+
+            # Step 4: Verify decrypted data matches original
+            assert retrieved_credentials is not None, \
+                "Retrieved credentials should not be None"
+            assert isinstance(retrieved_credentials, dict), \
+                "Retrieved credentials should be a dictionary"
+            assert retrieved_credentials == original_credentials, \
+                "Decrypted credentials should match original values exactly"
+
+            # Verify each field explicitly
+            assert retrieved_credentials["access_key"] == original_credentials["access_key"]
+            assert retrieved_credentials["secret_key"] == original_credentials["secret_key"]
+            assert retrieved_credentials["session_token"] == original_credentials["session_token"]
+            assert retrieved_credentials["environment"] == original_credentials["environment"]
+            assert retrieved_credentials["expiration"] == original_credentials["expiration"]
+
+            # Cleanup
+            SessionStore.clear(test_key)
+
+    def test_credential_roundtrip_with_special_characters(self, test_settings, db_session):
+        """Test encryption round-trip handles special characters correctly"""
+        from backend.core.utils.session_store import SessionStore
+
+        # Credentials with special characters that might cause encoding issues
+        special_credentials = {
+            "access_key": "AKIAIOSFO+/=EXAMPLE",
+            "secret_key": "wJalrXUtn/FEMI+K7MDENG=bPxRfiCY==",
+            "session_token": "Token+with/special==chars&more",
+            "unicode_field": "测试データテスト",
+            "json_special": '{"nested": "value", "quotes": "\\"escaped\\""}',
+        }
+
+        test_key = "credentials:special_chars_test"
+
+        with patch('backend.core.utils.session_store.is_feature_enabled', return_value=True):
+            # Store and retrieve
+            SessionStore.set(test_key, special_credentials)
+            retrieved = SessionStore.get(test_key)
+
+            # Verify round-trip preserves all special characters
+            assert retrieved is not None, "Should retrieve special character credentials"
+            assert retrieved == special_credentials, \
+                "Special characters should be preserved through encryption round-trip"
+
+            # Cleanup
+            SessionStore.clear(test_key)
+
+    def test_credential_roundtrip_with_empty_and_null_values(self, test_settings, db_session):
+        """Test encryption round-trip handles empty and edge case values"""
+        from backend.core.utils.session_store import SessionStore
+
+        # Edge case credentials
+        edge_case_credentials = {
+            "access_key": "AKIAIOSFODNN7EXAMPLE",
+            "secret_key": "",  # Empty string
+            "session_token": None,  # None value (becomes null in JSON)
+            "empty_list": [],
+            "empty_dict": {},
+            "zero_value": 0,
+            "false_value": False,
+        }
+
+        test_key = "credentials:edge_case_test"
+
+        with patch('backend.core.utils.session_store.is_feature_enabled', return_value=True):
+            # Store and retrieve
+            SessionStore.set(test_key, edge_case_credentials)
+            retrieved = SessionStore.get(test_key)
+
+            # Verify round-trip preserves edge case values
+            assert retrieved is not None, "Should retrieve edge case credentials"
+            assert retrieved["access_key"] == "AKIAIOSFODNN7EXAMPLE"
+            assert retrieved["secret_key"] == ""
+            assert retrieved["session_token"] is None
+            assert retrieved["empty_list"] == []
+            assert retrieved["empty_dict"] == {}
+            assert retrieved["zero_value"] == 0
+            assert retrieved["false_value"] is False
+
+            # Cleanup
+            SessionStore.clear(test_key)
+
+    def test_multiple_credential_roundtrips_same_key(self, test_settings, db_session):
+        """Test updating credentials multiple times preserves encryption integrity"""
+        from backend.core.utils.session_store import SessionStore
+        from backend.db.models.session_store import SessionData
+        from sqlalchemy import select
+
+        test_key = "credentials:multi_update_test"
+
+        # Series of credential updates
+        credential_versions = [
+            {"access_key": "AKIA_VERSION_1", "secret_key": "secret_v1"},
+            {"access_key": "AKIA_VERSION_2", "secret_key": "secret_v2", "new_field": "added"},
+            {"access_key": "AKIA_VERSION_3"},  # Fewer fields
+        ]
+
+        with patch('backend.core.utils.session_store.is_feature_enabled', return_value=True):
+            for version in credential_versions:
+                # Store this version
+                SessionStore.set(test_key, version)
+
+                # Verify storage is encrypted
+                row = db_session.scalar(
+                    select(SessionData).where(SessionData.key == test_key)
+                )
+                assert row is not None
+                assert isinstance(row.data, str)
+                assert row.data.startswith("gAAAAA"), "Each update should be encrypted"
+
+                # Verify retrieval matches current version
+                retrieved = SessionStore.get(test_key)
+                assert retrieved == version, \
+                    f"Retrieved should match version: {version}"
+
+            # Cleanup
+            SessionStore.clear(test_key)
+
     def test_encrypted_credentials_not_readable_without_key(self, test_settings):
         """Test encrypted credentials cannot be read without correct key"""
         from backend.core.utils.encryption import CredentialEncryption
