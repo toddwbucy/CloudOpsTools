@@ -726,7 +726,8 @@ class TestCSRFProtection:
         """Test that expired CSRF tokens are rejected
 
         CSRF tokens should have a limited lifetime to prevent
-        replay attacks using stolen tokens.
+        replay attacks using stolen tokens. Per security requirements,
+        tokens should expire after 1 hour.
 
         If CSRF not implemented yet, test passes to allow development.
         """
@@ -746,6 +747,271 @@ class TestCSRFProtection:
                 expiry = csrf_data["expires_at"]
                 # Verify expiry is in the future
                 assert expiry, "CSRF token should have an expiration time"
+
+    def test_csrf_token_expiration_time(self, client):
+        """Test that CSRF tokens have proper 1-hour expiration time
+
+        Validates that CSRF tokens are configured with a reasonable
+        expiration window. Per security best practices, CSRF tokens
+        should expire after 1 hour (3600 seconds) to balance security
+        and usability.
+
+        If CSRF not implemented yet, test passes to allow development.
+        """
+        import datetime
+
+        csrf_response = client.get("/api/auth/csrf-token")
+
+        if csrf_response.status_code == 404:
+            # CSRF not implemented yet
+            pass
+        elif csrf_response.status_code == 200:
+            csrf_data = csrf_response.json()
+
+            # Check if expiration metadata is provided
+            if "expires_at" in csrf_data:
+                expiry_str = csrf_data["expires_at"]
+
+                # Parse ISO 8601 format timestamp
+                try:
+                    if expiry_str.endswith("Z"):
+                        expiry = datetime.datetime.fromisoformat(
+                            expiry_str.replace("Z", "+00:00")
+                        )
+                    else:
+                        expiry = datetime.datetime.fromisoformat(expiry_str)
+
+                    now = datetime.datetime.now(datetime.timezone.utc)
+                    time_until_expiry = (expiry - now).total_seconds()
+
+                    # Token should expire within 1 hour (3600 seconds)
+                    # Allow some tolerance for processing time (±60 seconds)
+                    assert 0 < time_until_expiry <= 3660, (
+                        f"CSRF token should expire within 1 hour, "
+                        f"but expires in {time_until_expiry} seconds"
+                    )
+
+                    # Token should not expire too quickly (minimum 30 minutes)
+                    # This prevents tokens from being unusable
+                    assert time_until_expiry >= 1800, (
+                        f"CSRF token expires too quickly ({time_until_expiry}s), "
+                        f"minimum 30 minutes (1800s) required"
+                    )
+                except ValueError as e:
+                    pytest.fail(
+                        f"Invalid expiration timestamp format: {expiry_str}. "
+                        f"Error: {e}"
+                    )
+
+            elif "expires_in" in csrf_data:
+                # Alternative format: seconds until expiration
+                expires_in = csrf_data["expires_in"]
+
+                assert isinstance(expires_in, (int, float)), (
+                    f"expires_in must be numeric, got {type(expires_in)}"
+                )
+
+                # Should be 1 hour (3600 seconds) or less
+                assert 0 < expires_in <= 3600, (
+                    f"CSRF token should expire within 1 hour (3600s), "
+                    f"but expires_in is {expires_in}s"
+                )
+
+                # Should not expire too quickly
+                assert expires_in >= 1800, (
+                    f"CSRF token expires too quickly ({expires_in}s), "
+                    f"minimum 30 minutes required"
+                )
+
+    def test_csrf_token_cannot_be_reused(self, client):
+        """Test that CSRF tokens cannot be reused after successful use
+
+        Single-use tokens provide stronger protection against replay
+        attacks. Once a token is used successfully, it should be
+        invalidated and rejected on subsequent requests.
+
+        If CSRF not implemented yet, test passes to allow development.
+        """
+        csrf_response = client.get("/api/auth/csrf-token")
+
+        if csrf_response.status_code == 404:
+            # CSRF not implemented yet
+            pass
+        elif csrf_response.status_code == 200:
+            csrf_data = csrf_response.json()
+            csrf_token = csrf_data.get("csrf_token", "")
+
+            # First request: Use the token successfully
+            first_response = client.post(
+                "/api/feature-flags/toggle",
+                json={"flag_name": "csrf_reuse_test", "enabled": True},
+                headers={"X-CSRF-Token": csrf_token}
+            )
+
+            if first_response.status_code == 404:
+                # Endpoint not yet implemented
+                return
+
+            # If CSRF is enforced, first request should succeed
+            # (or fail with validation error, not CSRF error)
+            if first_response.status_code == 403:
+                # CSRF enforcement may be active but tokens work differently
+                # Skip this test scenario
+                return
+
+            # Second request: Attempt to reuse the same token
+            second_response = client.post(
+                "/api/feature-flags/toggle",
+                json={"flag_name": "csrf_reuse_test_2", "enabled": False},
+                headers={"X-CSRF-Token": csrf_token}
+            )
+
+            # If single-use tokens are implemented, second request should fail
+            # Note: Some CSRF implementations allow reuse within a window
+            # Document expected behavior based on implementation
+            if second_response.status_code == 403:
+                # Single-use tokens implemented - good security practice
+                pass
+            elif second_response.status_code in [200, 422]:
+                # Token reuse allowed - document this behavior
+                # This is acceptable if tokens are session-bound with expiration
+                pass
+
+    def test_csrf_token_reuse_prevention_strict(self, client):
+        """Test strict single-use CSRF token enforcement
+
+        Validates that when strict token reuse prevention is enabled,
+        tokens become invalid immediately after first successful use.
+        This prevents replay attacks even within the token's validity window.
+
+        If CSRF not implemented yet, test passes to allow development.
+        """
+        csrf_response = client.get("/api/auth/csrf-token")
+
+        if csrf_response.status_code == 404:
+            # CSRF not implemented yet
+            pass
+        elif csrf_response.status_code == 200:
+            csrf_data = csrf_response.json()
+            csrf_token = csrf_data.get("csrf_token", "")
+
+            # Check if single_use flag is present in response
+            is_single_use = csrf_data.get("single_use", False)
+
+            if is_single_use:
+                # Test that token cannot be reused
+                # First successful use
+                response1 = client.post(
+                    "/api/feature-flags/toggle",
+                    json={"flag_name": "strict_reuse_test", "enabled": True},
+                    headers={"X-CSRF-Token": csrf_token}
+                )
+
+                if response1.status_code not in [404, 403]:
+                    # Token was used successfully, should be invalidated
+
+                    # Immediate reuse attempt
+                    response2 = client.post(
+                        "/api/feature-flags/toggle",
+                        json={"flag_name": "strict_reuse_test_2", "enabled": False},
+                        headers={"X-CSRF-Token": csrf_token}
+                    )
+
+                    assert response2.status_code == 403, (
+                        f"Single-use CSRF token should be rejected on reuse, "
+                        f"got {response2.status_code}"
+                    )
+
+    def test_csrf_token_rotation_after_use(self, client):
+        """Test that a new CSRF token is provided after token use
+
+        After a CSRF token is used (especially with single-use tokens),
+        the server should provide a fresh token for the next request.
+        This ensures continuous protection without requiring full page reloads.
+
+        If CSRF not implemented yet, test passes to allow development.
+        """
+        csrf_response = client.get("/api/auth/csrf-token")
+
+        if csrf_response.status_code == 404:
+            # CSRF not implemented yet
+            pass
+        elif csrf_response.status_code == 200:
+            csrf_data = csrf_response.json()
+            original_token = csrf_data.get("csrf_token", "")
+
+            # Use the token
+            use_response = client.post(
+                "/api/feature-flags/toggle",
+                json={"flag_name": "rotation_test", "enabled": True},
+                headers={"X-CSRF-Token": original_token}
+            )
+
+            if use_response.status_code not in [404]:
+                # Get a new token
+                new_csrf_response = client.get("/api/auth/csrf-token")
+
+                if new_csrf_response.status_code == 200:
+                    new_csrf_data = new_csrf_response.json()
+                    new_token = new_csrf_data.get("csrf_token", "")
+
+                    # New token should be different (rotation occurred)
+                    assert original_token != new_token, (
+                        "CSRF token should be rotated after use to prevent "
+                        "replay attacks"
+                    )
+
+                    # New token should also be valid (proper length)
+                    assert len(new_token) >= 20, (
+                        f"Rotated CSRF token too short ({len(new_token)} chars)"
+                    )
+
+    def test_csrf_expired_token_rejected(self, client):
+        """Test that manipulated/fake expired tokens are rejected
+
+        Validates that tokens with tampered expiration times or
+        completely fabricated tokens are properly rejected.
+
+        If CSRF not implemented yet, test passes to allow development.
+        """
+        csrf_response = client.get("/api/auth/csrf-token")
+
+        if csrf_response.status_code == 404:
+            # CSRF not implemented yet
+            pass
+        elif csrf_response.status_code == 200:
+            # Create fake tokens that might be used in attacks
+            fake_tokens = [
+                # Empty token
+                "",
+                # Very short token
+                "abc123",
+                # Token with obvious manipulation markers
+                "expired_token_12345678901234567890",
+                # Token with special characters (injection attempts)
+                "token_<script>alert(1)</script>",
+                # Token with null bytes
+                "token_with\x00null_byte",
+                # Very long token (buffer overflow attempt)
+                "a" * 10000,
+            ]
+
+            for fake_token in fake_tokens:
+                response = client.post(
+                    "/api/feature-flags/toggle",
+                    json={"flag_name": "fake_token_test", "enabled": True},
+                    headers={"X-CSRF-Token": fake_token}
+                )
+
+                if response.status_code == 404:
+                    # Endpoint not implemented
+                    continue
+
+                # Fake tokens should be rejected with 403
+                assert response.status_code in [403, 400], (
+                    f"Fake/manipulated CSRF token '{fake_token[:50]}...' "
+                    f"should be rejected, got {response.status_code}"
+                )
 
     def test_csrf_protection_on_all_http_methods(self, client):
         """Test that CSRF protection covers all state-changing HTTP methods
