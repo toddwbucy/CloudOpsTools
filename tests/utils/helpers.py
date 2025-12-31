@@ -265,20 +265,41 @@ def generate_large_payload(size_kb: int = 100) -> str:
 
 
 def assert_rate_limiting_works(client, endpoint: str, max_requests: int = 10, window_seconds: int = 60):
-    """Test that rate limiting is working (when implemented)"""
-    # This is a placeholder for rate limiting tests
-    # Will be implemented when rate limiting is added
+    """
+    Test that rate limiting is working.
+
+    IMPLEMENTATION STATUS: NOT IMPLEMENTED (as of Phase 1)
+
+    This is a placeholder helper for rate limiting tests. Rate limiting is not
+    currently implemented in the CloudOpsTools backend, so this function only
+    verifies that the endpoint handles rapid requests gracefully.
+
+    WONT-FIX REASONING:
+    Rate limiting implementation is out of scope for Phase 1 Security Test Suite.
+    This helper will be updated when rate limiting is implemented in a future phase.
+
+    Args:
+        client: Test client instance
+        endpoint: API endpoint to test
+        max_requests: Expected rate limit threshold
+        window_seconds: Rate limit time window
+
+    Future implementation should:
+        - Check for 429 responses after max_requests
+        - Verify X-RateLimit-* headers
+        - Check Retry-After header in 429 responses
+    """
     responses = []
-    
+
     for i in range(max_requests + 5):
         response = client.get(endpoint)
         responses.append(response)
-        
+
         # Small delay to avoid overwhelming the system
         time.sleep(0.01)
-    
-    # For now, just verify all requests succeed
-    # TODO: When rate limiting is implemented, check for 429 responses
+
+    # Current behavior: All requests succeed (no rate limiting implemented)
+    # WONT-FIX: Rate limiting not implemented in Phase 1
     success_count = len([r for r in responses if r.status_code == 200])
     assert success_count >= max_requests, "Basic functionality should work"
 
