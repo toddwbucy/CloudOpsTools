@@ -67,21 +67,88 @@ class TestCSRFProtection:
     """Test CSRF protection measures (Phase 1 implementation)"""
     
     def test_csrf_token_required_for_state_changes(self, client):
-        """Test CSRF protection for state-changing operations"""
-        # Phase 1 will implement CSRF tokens
-        # For now, test that the endpoint exists
-        response = client.post(
-            "/api/feature-flags/toggle",
-            json={"flag_name": "test_flag", "enabled": True}
-        )
-        
-        # Should either work (no CSRF yet) or return proper error
-        assert response.status_code in [200, 403, 422]
-        
-        # TODO: After Phase 1, test:
-        # - POST without CSRF token should fail with 403
-        # - POST with valid CSRF token should succeed
-        # - CSRF tokens should be unique per session
+        """Test CSRF protection for state-changing operations
+
+        Validates that state-changing endpoints (POST/PUT/DELETE) require
+        valid CSRF tokens when CSRF protection is enabled:
+        1. POST without CSRF token should fail with 403 Forbidden
+        2. POST with valid CSRF token should succeed
+        3. CSRF tokens should be unique per session
+
+        If CSRF protection is not yet implemented (Phase 1 feature),
+        the test validates current behavior and documents expected behavior.
+        """
+        # First, check if CSRF token endpoint exists
+        csrf_response = client.get("/api/auth/csrf-token")
+
+        if csrf_response.status_code == 404:
+            # CSRF endpoint not implemented yet - test current behavior
+            # State-changing endpoint should still work without CSRF
+            response = client.post(
+                "/api/feature-flags/toggle",
+                json={"flag_name": "test_flag", "enabled": True}
+            )
+            # Should work or return validation error (not CSRF error)
+            assert response.status_code in [200, 422], (
+                f"Without CSRF implementation, expected 200 or 422, "
+                f"got {response.status_code}"
+            )
+        elif csrf_response.status_code == 200:
+            # CSRF protection is implemented - test full protection
+
+            # Get a valid CSRF token
+            csrf_data = csrf_response.json()
+            assert "csrf_token" in csrf_data, "CSRF response missing token"
+            valid_token = csrf_data["csrf_token"]
+
+            # Test 1: POST without CSRF token should fail with 403
+            response_no_token = client.post(
+                "/api/feature-flags/toggle",
+                json={"flag_name": "test_flag", "enabled": True}
+            )
+            assert response_no_token.status_code == 403, (
+                f"POST without CSRF token should return 403, "
+                f"got {response_no_token.status_code}"
+            )
+
+            # Test 2: POST with invalid CSRF token should fail with 403
+            response_invalid = client.post(
+                "/api/feature-flags/toggle",
+                json={"flag_name": "test_flag", "enabled": True},
+                headers={"X-CSRF-Token": "invalid-token-12345"}
+            )
+            assert response_invalid.status_code == 403, (
+                f"POST with invalid CSRF token should return 403, "
+                f"got {response_invalid.status_code}"
+            )
+
+            # Test 3: POST with valid CSRF token should succeed
+            response_valid = client.post(
+                "/api/feature-flags/toggle",
+                json={"flag_name": "test_flag", "enabled": True},
+                headers={"X-CSRF-Token": valid_token}
+            )
+            # Should succeed (200) or fail validation (422), not CSRF error
+            assert response_valid.status_code in [200, 422], (
+                f"POST with valid CSRF token should succeed or return "
+                f"validation error, got {response_valid.status_code}"
+            )
+
+            # Test 4: Verify CSRF tokens are unique per session
+            csrf_response2 = client.get("/api/auth/csrf-token")
+            if csrf_response2.status_code == 200:
+                csrf_data2 = csrf_response2.json()
+                token2 = csrf_data2.get("csrf_token", "")
+                assert valid_token != token2, (
+                    "CSRF tokens must be unique per request to prevent "
+                    "replay attacks"
+                )
+        else:
+            # Unexpected status code from CSRF endpoint
+            pytest.fail(
+                f"Unexpected status {csrf_response.status_code} from "
+                f"CSRF token endpoint"
+            )
     
     def test_csrf_token_generation_endpoint(self, client):
         """Test CSRF token generation endpoint
