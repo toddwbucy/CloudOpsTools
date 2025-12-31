@@ -617,6 +617,381 @@ class TestXSSProtection:
         match = re.search(r"'nonce-([^']+)'", csp_header)
         return match.group(1) if match else ""
 
+    # =========================================================================
+    # XSS Edge Case Tests (Unicode, URL Encoding, Base64)
+    # =========================================================================
+
+    # Unicode XSS payloads - using various unicode representations
+    UNICODE_XSS_PAYLOADS = [
+        # Fullwidth unicode characters (can bypass filters)
+        "\uff1cscript\uff1ealert('xss')\uff1c/script\uff1e",  # Fullwidth < and >
+        # Unicode escape sequences
+        "\\u003cscript\\u003ealert('xss')\\u003c/script\\u003e",
+        # Mixed unicode and ASCII
+        "<scr\u0000ipt>alert('xss')</script>",  # Null byte injection
+        # Homoglyph attacks (lookalike characters)
+        "\u003cscript\u003ealert('xss')\u003c/script\u003e",  # Unicode code points
+        # UTF-7 encoding attempt
+        "+ADw-script+AD4-alert('xss')+ADw-/script+AD4-",
+        # Unicode normalization attacks
+        "<script>alert(\u2018xss\u2019)</script>",  # Smart quotes
+        # Zero-width characters embedded
+        "<scri\u200bpt>alert('xss')</script>",  # Zero-width space
+        # Unicode whitespace variations
+        "<script\u00a0>alert('xss')</script>",  # Non-breaking space in tag
+    ]
+
+    # URL-encoded XSS payloads
+    URL_ENCODED_XSS_PAYLOADS = [
+        # Standard URL encoding
+        "%3Cscript%3Ealert('xss')%3C/script%3E",
+        # Double URL encoding
+        "%253Cscript%253Ealert('xss')%253C/script%253E",
+        # Mixed encoding
+        "%3Cscript%3Ealert%28%27xss%27%29%3C/script%3E",
+        # Partial encoding (common bypass)
+        "<%73cript>alert('xss')</script>",  # %73 = s
+        # Event handler URL encoded
+        "%3Cimg%20src%3Dx%20onerror%3Dalert('xss')%3E",
+        # JavaScript URL scheme encoded
+        "javascript%3Aalert%28%27xss%27%29",
+        # Unicode URL encoding
+        "%u003Cscript%u003Ealert('xss')%u003C/script%u003E",
+        # Hex encoding without percent
+        "&#x3C;script&#x3E;alert('xss')&#x3C;/script&#x3E;",
+    ]
+
+    # Base64-encoded XSS payloads
+    BASE64_XSS_PAYLOADS = [
+        # data: URI with base64 XSS
+        "data:text/html;base64,PHNjcmlwdD5hbGVydCgneHNzJyk8L3NjcmlwdD4=",
+        # JavaScript with base64 payload
+        "javascript:eval(atob('YWxlcnQoJ3hzcycp'))",
+        # SVG with base64 embedded script
+        "data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoJ3hzcycpPg==",
+        # HTML base64 in data URI
+        "data:text/html;base64,PGltZyBzcmM9eCBvbmVycm9yPWFsZXJ0KCd4c3MnKT4=",
+        # Base64 with charset specification
+        "data:text/html;charset=utf-8;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==",
+        # Partial base64 decoding attempt
+        "eval(atob('YWxlcnQoJ3hzcycp'))",
+    ]
+
+    @pytest.mark.parametrize("payload", UNICODE_XSS_PAYLOADS)
+    def test_xss_unicode_payloads_in_feature_flag(self, client, payload):
+        """Test Unicode XSS payloads are handled in feature flag name
+
+        Unicode attacks attempt to bypass filters using:
+        - Fullwidth characters that look like < and >
+        - Unicode escape sequences
+        - Null byte injection
+        - Homoglyph (lookalike) characters
+        - Zero-width characters embedded in tags
+        """
+        response = client.post(
+            "/api/feature-flags/toggle",
+            json={"flag_name": payload, "enabled": True}
+        )
+
+        if response.status_code == 404:
+            pass  # Endpoint not yet implemented
+        elif response.status_code == 200:
+            # Check both the raw payload and decoded versions
+            response_text = response.text
+            assert "<script>" not in response_text.lower(), (
+                f"Unicode XSS payload resulted in script tag in response"
+            )
+            assert "alert(" not in response_text, (
+                f"Unicode XSS payload 'alert' found in response"
+            )
+        else:
+            assert response.status_code in [400, 422, 403], (
+                f"Unexpected status {response.status_code} for Unicode XSS payload"
+            )
+
+    @pytest.mark.parametrize("payload", UNICODE_XSS_PAYLOADS)
+    def test_xss_unicode_payloads_in_script_name(self, client, payload):
+        """Test Unicode XSS payloads are handled in script name field
+
+        Script names with Unicode attacks could lead to stored XSS
+        if the application decodes the Unicode before rendering.
+        """
+        response = client.post(
+            "/api/scripts/",
+            json={
+                "name": payload,
+                "content": "#!/bin/bash\necho 'test'",
+                "description": "Test script",
+                "script_type": "bash"
+            }
+        )
+
+        if response.status_code == 404:
+            pass
+        elif response.status_code in [200, 201]:
+            response_text = response.text
+            assert "<script>" not in response_text.lower()
+            assert "onerror=" not in response_text.lower()
+        else:
+            assert response.status_code in [400, 422, 403, 401]
+
+    @pytest.mark.parametrize("payload", URL_ENCODED_XSS_PAYLOADS)
+    def test_xss_url_encoded_payloads_in_feature_flag(self, client, payload):
+        """Test URL-encoded XSS payloads are handled in feature flag name
+
+        URL encoding attacks attempt to bypass filters by:
+        - Single encoding (%3C for <)
+        - Double encoding (%253C)
+        - Partial/selective encoding
+        - Unicode URL encoding (%u003C)
+        """
+        response = client.post(
+            "/api/feature-flags/toggle",
+            json={"flag_name": payload, "enabled": True}
+        )
+
+        if response.status_code == 404:
+            pass
+        elif response.status_code == 200:
+            response_text = response.text
+            # Check for decoded payload in response
+            assert "<script>" not in response_text.lower(), (
+                f"URL-encoded XSS decoded to script tag"
+            )
+            # Also check the encoded form wasn't decoded dangerously
+            assert "alert(" not in response_text
+        else:
+            assert response.status_code in [400, 422, 403]
+
+    @pytest.mark.parametrize("payload", URL_ENCODED_XSS_PAYLOADS)
+    def test_xss_url_encoded_payloads_in_script_description(self, client, payload):
+        """Test URL-encoded XSS payloads are handled in script description
+
+        Script descriptions may be URL-decoded before rendering,
+        making them vulnerable to encoded XSS attacks.
+        """
+        response = client.post(
+            "/api/scripts/",
+            json={
+                "name": "test-script",
+                "content": "#!/bin/bash\necho 'test'",
+                "description": payload,
+                "script_type": "bash"
+            }
+        )
+
+        if response.status_code == 404:
+            pass
+        elif response.status_code in [200, 201]:
+            response_text = response.text
+            assert "<script>" not in response_text.lower()
+            assert "onerror=" not in response_text.lower()
+        else:
+            assert response.status_code in [400, 422, 403, 401]
+
+    @pytest.mark.parametrize("payload", BASE64_XSS_PAYLOADS)
+    def test_xss_base64_payloads_in_feature_flag(self, client, payload):
+        """Test Base64-encoded XSS payloads are handled in feature flag name
+
+        Base64 attacks use:
+        - data: URIs with base64 content
+        - JavaScript eval(atob(...)) patterns
+        - SVG images with embedded scripts
+        """
+        response = client.post(
+            "/api/feature-flags/toggle",
+            json={"flag_name": payload, "enabled": True}
+        )
+
+        if response.status_code == 404:
+            pass
+        elif response.status_code == 200:
+            response_text = response.text
+            # data: URIs should not be reflected or should be sanitized
+            if "data:" in payload:
+                assert "data:text/html" not in response_text, (
+                    f"Base64 data URI reflected in response"
+                )
+            assert "eval(atob" not in response_text, (
+                f"Base64 eval pattern found in response"
+            )
+        else:
+            assert response.status_code in [400, 422, 403]
+
+    @pytest.mark.parametrize("payload", BASE64_XSS_PAYLOADS)
+    def test_xss_base64_payloads_in_change_description(self, client, payload):
+        """Test Base64-encoded XSS payloads are handled in change description
+
+        Change descriptions stored with base64 payloads could execute
+        if the application decodes and renders them.
+        """
+        response = client.post(
+            "/api/script-runner/changes/",
+            json={
+                "change_number": "CHG0001234",
+                "description": payload,
+                "status": "pending",
+                "instances": []
+            }
+        )
+
+        if response.status_code == 404:
+            pass
+        elif response.status_code in [200, 201]:
+            response_text = response.text
+            assert "data:text/html" not in response_text
+            assert "eval(atob" not in response_text
+        else:
+            assert response.status_code in [400, 422, 403, 401]
+
+    def test_xss_mixed_encoding_bypass_attempts(self, client):
+        """Test XSS payloads using mixed encoding techniques
+
+        Attackers may combine multiple encoding methods to bypass filters:
+        - Unicode + URL encoding
+        - Base64 + Unicode
+        - Multiple encoding layers
+        """
+        mixed_payloads = [
+            # URL-encoded unicode
+            "%3C%u0073cript%3Ealert('xss')%3C/script%3E",
+            # Base64 in JavaScript with unicode
+            "javascript:eval(atob('\u0059\u0057\u0078\u006c'))",
+            # HTML entities + URL encoding
+            "&lt;script%3Ealert('xss')&lt;/script%3E",
+            # Mixed case + encoding
+            "%3CsCrIpT%3Ealert('xss')%3C/ScRiPt%3E",
+            # Null bytes + encoding
+            "%3Cscr%00ipt%3Ealert('xss')%3C/script%3E",
+        ]
+
+        for payload in mixed_payloads:
+            response = client.post(
+                "/api/feature-flags/toggle",
+                json={"flag_name": payload, "enabled": True}
+            )
+
+            if response.status_code == 404:
+                continue
+            elif response.status_code == 200:
+                response_text = response.text
+                assert "<script>" not in response_text.lower(), (
+                    f"Mixed encoding XSS bypass: {payload[:50]}"
+                )
+            else:
+                assert response.status_code in [400, 422, 403]
+
+    def test_xss_html_entity_encoding_payloads(self, client):
+        """Test XSS payloads using HTML entity encoding
+
+        HTML entities can be used to bypass filters if the application
+        decodes entities before rendering without re-escaping.
+        """
+        entity_payloads = [
+            # Decimal HTML entities
+            "&#60;script&#62;alert('xss')&#60;/script&#62;",
+            # Hex HTML entities
+            "&#x3C;script&#x3E;alert('xss')&#x3C;/script&#x3E;",
+            # Named entities
+            "&lt;script&gt;alert('xss')&lt;/script&gt;",
+            # Mixed decimal and named
+            "&#60;script&gt;alert('xss')&#60;/script&gt;",
+            # Without semicolons (browser may still parse)
+            "&#60script&#62alert('xss')&#60/script&#62",
+            # Padded zeros in decimal
+            "&#0060;script&#0062;alert('xss')&#0060;/script&#0062;",
+        ]
+
+        for payload in entity_payloads:
+            response = client.post(
+                "/api/scripts/",
+                json={
+                    "name": payload,
+                    "content": "echo test",
+                    "description": "Test",
+                    "script_type": "bash"
+                }
+            )
+
+            if response.status_code == 404:
+                continue
+            elif response.status_code in [200, 201]:
+                response_text = response.text
+                # After entity decoding, script tags should not be present
+                assert "<script>" not in response_text.lower(), (
+                    f"HTML entity XSS decoded to script: {payload[:50]}"
+                )
+            else:
+                assert response.status_code in [400, 422, 403, 401]
+
+    def test_xss_unicode_normalization_attacks(self, client):
+        """Test XSS payloads exploiting unicode normalization
+
+        Unicode normalization (NFC, NFD, NFKC, NFKD) can transform
+        characters in unexpected ways that bypass security filters.
+        """
+        normalization_payloads = [
+            # Combining characters that normalize to < and >
+            "﹤script﹥alert('xss')﹤/script﹥",  # Small form variants
+            "＜script＞alert('xss')＜/script＞",  # Fullwidth
+            # Characters that look like ASCII but aren't
+            "<ｓｃｒｉｐｔ>alert('xss')</ｓｃｒｉｐｔ>",  # Fullwidth letters
+            # Combining diacritical marks
+            "<scr\u0300ipt>alert('xss')</script>",  # Combining grave accent
+            # Overlong sequences (in various encodings)
+            "<script>alert\u200b('xss')</script>",  # Zero-width space
+        ]
+
+        for payload in normalization_payloads:
+            response = client.post(
+                "/api/script-runner/changes/",
+                json={
+                    "change_number": "CHG0001234",
+                    "description": payload,
+                    "status": "pending",
+                    "instances": []
+                }
+            )
+
+            if response.status_code == 404:
+                continue
+            elif response.status_code in [200, 201]:
+                response_text = response.text
+                # Check for normalized versions
+                assert "alert(" not in response_text.lower(), (
+                    f"Unicode normalization XSS: {payload[:50]}"
+                )
+            else:
+                assert response.status_code in [400, 422, 403, 401]
+
+    def test_xss_edge_cases_in_query_parameters(self, client):
+        """Test XSS edge cases in query parameters
+
+        Query parameters may be URL-decoded differently than
+        request bodies, requiring separate edge case testing.
+        """
+        import urllib.parse
+
+        edge_case_payloads = [
+            # Unicode in query params
+            "<script>\u0000alert('xss')</script>",
+            # Double-encoded
+            urllib.parse.quote(urllib.parse.quote("<script>alert(1)</script>")),
+            # Base64 data URI
+            "data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==",
+        ]
+
+        for payload in edge_case_payloads:
+            encoded_payload = urllib.parse.quote(payload, safe='')
+            response = client.get(f"/api/scripts/?search={encoded_payload}")
+
+            if response.status_code not in [404, 405]:
+                response_text = response.text
+                # The decoded payload should not appear unescaped
+                assert "<script>" not in response_text.lower(), (
+                    f"Query param XSS edge case: {payload[:50]}"
+                )
+
     def test_user_input_sanitization(self, client):
         """Test that user input is properly sanitized
 
