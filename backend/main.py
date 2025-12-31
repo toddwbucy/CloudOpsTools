@@ -55,14 +55,68 @@ def health_check():
     return {"status": "healthy"}
 
 
+def _check_storage_health() -> dict:
+    """
+    Check the health of the rate limiting storage backend.
+
+    Returns dict with storage health status and details.
+    """
+    storage_type = "redis" if settings.redis_url else "memory"
+
+    if storage_type == "memory":
+        return {
+            "type": "memory",
+            "healthy": True,
+            "message": "In-memory storage active",
+        }
+
+    # Check Redis connectivity if configured
+    try:
+        import redis
+
+        # Parse Redis URL and test connection
+        client = redis.from_url(settings.redis_url, socket_timeout=2)
+        client.ping()
+        return {
+            "type": "redis",
+            "healthy": True,
+            "message": "Redis connection successful",
+        }
+    except ImportError:
+        return {
+            "type": "redis",
+            "healthy": False,
+            "message": "Redis client not installed",
+        }
+    except Exception as e:
+        logger.warning("Redis health check failed: %s", str(e))
+        return {
+            "type": "redis",
+            "healthy": False,
+            "message": f"Redis connection failed: {str(e)}",
+        }
+
+
 @app.get("/api/health")
 def api_health_check():
     """
-    Enhanced health check endpoint with rate limiting status.
+    Enhanced health check endpoint with rate limiting status and metrics.
 
-    Returns system health including rate limiting configuration and status.
+    Returns system health including rate limiting configuration, storage
+    backend health, and protected endpoint information.
     """
     from datetime import datetime
+
+    # Check storage backend health
+    storage_health = _check_storage_health()
+
+    # Determine overall rate limiting status
+    rate_limit_enabled = hasattr(app.state, "limiter") and app.state.limiter is not None
+    rate_limit_status = "enabled" if rate_limit_enabled else "disabled"
+
+    # If storage is unhealthy but limiter is configured, report degraded status
+    if rate_limit_enabled and not storage_health["healthy"]:
+        rate_limit_status = "degraded"
 
     return {
         "status": "healthy",
@@ -70,12 +124,24 @@ def api_health_check():
         "version": "2.0.0",
         "services": {
             "rate_limiting": {
-                "status": "enabled",
-                "storage_backend": "redis" if settings.redis_url else "memory",
+                "status": rate_limit_status,
+                "storage": storage_health,
                 "configuration": {
                     "auth_endpoints": settings.rate_limit_auth_endpoints,
                     "execution_endpoints": settings.rate_limit_execution_endpoints,
                     "read_endpoints": settings.rate_limit_read_endpoints,
+                },
+                "endpoints_protected": {
+                    "auth": [
+                        "/api/auth/aws-credentials",
+                    ],
+                    "execution": [
+                        "/api/tools/{tool_id}/execute",
+                    ],
+                    "read": [
+                        "/api/tools/",
+                        "/api/tools/{tool_id}",
+                    ],
                 },
             }
         },
