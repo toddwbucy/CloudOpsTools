@@ -3018,24 +3018,84 @@ class TestSecurityHeaders:
 @pytest.mark.security
 @pytest.mark.rate_limiting
 class TestRateLimiting:
-    """Test rate limiting protection (future implementation)"""
-    
+    """
+    Test rate limiting protection.
+
+    IMPLEMENTATION STATUS: NOT IMPLEMENTED (as of Phase 1)
+
+    Rate limiting is not currently implemented in the CloudOpsTools backend.
+    These tests verify the current behavior (no rate limiting) and serve as
+    documentation for when rate limiting is implemented in a future phase.
+
+    Evidence of non-implementation:
+    - No rate limiting middleware in backend/main.py
+    - No SlowAPI or similar dependencies in pyproject.toml
+    - No rate limiting configuration in backend/core/config.py
+
+    WONT-FIX REASONING:
+    Rate limiting implementation is out of scope for Phase 1 Security Test Suite.
+    Phase 1 focuses on testing existing security implementations (XSS, CSRF,
+    credential encryption, session security, security headers). Rate limiting
+    would require implementing new production code, which is explicitly out
+    of scope per the spec: "Implementing new security features (only testing
+    existing security implementations)".
+
+    FUTURE WORK:
+    When rate limiting is implemented (likely using SlowAPI or similar):
+    1. Update test_api_rate_limiting_configured to verify 429 responses
+    2. Update test_auth_endpoint_rate_limiting to verify stricter limits on auth
+    3. Add tests for Retry-After header, rate limit headers (X-RateLimit-*)
+    4. Add tests for per-IP vs per-user rate limiting
+    5. Add tests for rate limit bypass protection
+    """
+
     def test_api_rate_limiting_configured(self, client):
-        """Test API endpoints have rate limiting"""
+        """
+        Test API endpoints have rate limiting.
+
+        Current behavior: No rate limiting implemented - all requests succeed.
+
+        WONT-FIX: Rate limiting not implemented in Phase 1. This test documents
+        expected behavior and verifies the API handles rapid requests gracefully
+        even without rate limiting protection.
+
+        Future test should verify:
+        - After N requests within time window, return 429 Too Many Requests
+        - Include X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset headers
+        - Include Retry-After header in 429 responses
+        """
         # Make multiple rapid requests
         responses = []
         for _ in range(20):
             response = client.get("/api/health")
             responses.append(response)
-        
-        # For now, all should succeed (no rate limiting yet)
+
+        # Current behavior: All requests succeed (no rate limiting implemented)
+        # This verifies the API handles rapid requests without errors
         assert all(r.status_code == 200 for r in responses)
-        
-        # TODO: After rate limiting implementation:
-        # Check that some requests are rate limited (429 status)
-    
+
+        # WONT-FIX: Rate limiting not implemented in Phase 1
+        # Future implementation should:
+        # - Return 429 status after exceeding rate limit
+        # - Check for X-RateLimit-* headers
+        # - Verify Retry-After header is present
+
     def test_auth_endpoint_rate_limiting(self, client):
-        """Test authentication endpoints have stricter rate limiting"""
+        """
+        Test authentication endpoints have stricter rate limiting.
+
+        Current behavior: No rate limiting implemented - all auth attempts proceed.
+
+        WONT-FIX: Rate limiting not implemented in Phase 1. This test documents
+        that multiple failed auth attempts are handled gracefully (no crashes,
+        proper error responses) even without brute-force protection.
+
+        Future test should verify:
+        - Authentication endpoints have stricter limits (e.g., 5 attempts/min)
+        - Failed attempts count toward rate limit
+        - Return 429 with appropriate lockout period after threshold
+        - Include Retry-After header indicating lockout duration
+        """
         # Attempt multiple failed authentication attempts
         responses = []
         for _ in range(10):
@@ -3044,11 +3104,20 @@ class TestRateLimiting:
                 json={"access_key": "fake", "secret_key": "fake"}
             )
             responses.append(response)
-        
-        # For now, document what should be tested
-        # TODO: After implementation:
-        # - Should start returning 429 after N failed attempts
-        # - Should include Retry-After header
+
+        # Current behavior: All requests are processed (no rate limiting)
+        # Verify the API handles repeated auth attempts gracefully
+        # (returns consistent error responses, no server errors)
+        for response in responses:
+            # Should get consistent 400/401 responses, not 5xx errors
+            assert response.status_code in [400, 401, 422], \
+                f"Unexpected status {response.status_code} - API should handle auth errors gracefully"
+
+        # WONT-FIX: Rate limiting not implemented in Phase 1
+        # Future implementation should:
+        # - Return 429 after N failed attempts (e.g., 5 per minute)
+        # - Include Retry-After header with lockout duration
+        # - Log suspicious activity for security monitoring
 
 
 @pytest.mark.security
