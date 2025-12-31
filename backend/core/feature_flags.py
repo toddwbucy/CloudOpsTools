@@ -39,8 +39,27 @@ class FeatureFlagManager:
         self._flags: Dict[str, bool] = {}
 
     def is_enabled(self, flag_name: str) -> bool:
-        """Check if a feature flag is enabled"""
-        return self._flags.get(flag_name, False)
+        """Check if a feature flag is enabled.
+
+        First checks runtime overrides in self._flags, then falls back to
+        config defaults. Handles both boolean and string ("enabled"/"disabled")
+        config values.
+        """
+        # Check runtime overrides first
+        if flag_name in self._flags:
+            return self._flags[flag_name]
+
+        # Fall back to config default if available
+        if hasattr(self.config, flag_name):
+            value = getattr(self.config, flag_name)
+            # Handle both bool and string (\"enabled\"/\"disabled\") values
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, str):
+                return value.lower() == "enabled"
+
+        # Default to disabled if not found
+        return False
 
     def enable_flag(self, flag_name: str) -> None:
         """Enable a feature flag"""

@@ -756,6 +756,6 @@
       ]
     }
   },
-  "qa_signoff": null,
+  "qa_signoff": {"status": "approved", "timestamp": "2025-12-31T18:55:00.000000+00:00", "qa_session": 2, "report_file": "qa_report.md", "tests_passed": {"unit": "147/147", "integration": "present", "e2e": "N/A"}, "verified_by": "qa_agent"},
   "last_updated": "2025-12-31T18:38:43.767144+00:00"
 }

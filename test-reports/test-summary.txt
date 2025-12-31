@@ -1,14 +1,14 @@
 PCM-Ops Tools Test Run Summary
 =============================
 
-Date: Sun Aug 24 09:02:59 AM CDT 2025
-Test Type: integration
+Date: Tue Dec 30 10:12:09 PM CST 2025
+Test Type: security
 Exit Code: 1
 Coverage Enabled: No
 Parallel Execution: No
 
 Command Executed:
-poetry run pytest -q -m integration tests/integration/
+poetry run pytest -q -m security tests/security/
 
 Reports Generated:
 
