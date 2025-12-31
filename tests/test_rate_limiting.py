@@ -19,16 +19,15 @@ def reset_limiter():
     in-memory storage, preventing tests from affecting each other due to
     accumulated rate limit counters.
     """
-    # Clear the limiter's storage before each test
+    # Clear the limiter's storage before each test using public API
     if hasattr(app.state, "limiter") and app.state.limiter:
-        # SlowAPI's in-memory storage can be cleared via the storage backend
-        if hasattr(app.state.limiter, "_storage"):
-            app.state.limiter._storage.storage.clear()
+        if hasattr(app.state.limiter, "storage"):
+            app.state.limiter.storage.reset()
     yield
     # Cleanup after test (optional, but good practice)
     if hasattr(app.state, "limiter") and app.state.limiter:
-        if hasattr(app.state.limiter, "_storage"):
-            app.state.limiter._storage.storage.clear()
+        if hasattr(app.state.limiter, "storage"):
+            app.state.limiter.storage.reset()
 
 
 @pytest.fixture

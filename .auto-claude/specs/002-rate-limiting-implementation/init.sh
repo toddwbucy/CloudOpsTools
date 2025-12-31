@@ -23,7 +23,19 @@ wait_for_service() {
     local count=0
 
     echo "Waiting for $name on port $port..."
-    while ! nc -z localhost $port 2>/dev/null; do
+
+    # Portable port check function
+    check_port() {
+        if command -v nc >/dev/null 2>&1; then
+            # Use nc if available
+            nc -z localhost "$1" 2>/dev/null
+        else
+            # Fallback to bash /dev/tcp
+            (echo >/dev/tcp/localhost/"$1") 2>/dev/null
+        fi
+    }
+
+    while ! check_port "$port"; do
         count=$((count + 1))
         if [ $count -ge $max ]; then
             echo -e "${RED}$name failed to start${NC}"
