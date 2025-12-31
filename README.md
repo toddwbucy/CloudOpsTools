@@ -1,18 +1,43 @@
-# PCM-Ops Tools
+# CloudOpsTools
+
+**A Multi-Cloud Script Execution Framework**
+
+## What Is CloudOpsTools?
+
+CloudOpsTools is a **unified framework for executing arbitrary scripts and workflows** across AWS, Azure, and GCP cloud environments. Think of it as your **multi-cloud automation engine** - you define the scripts, we handle the execution across accounts, regions, and providers.
+
+### 🎯 Key Concept
+
+The **Linux QC Patching workflows** (Prep/Post) and **SFT Fixer** included in this repository are **example implementations** that demonstrate the framework's capabilities. They showcase how to:
+
+- Execute scripts across multiple AWS accounts and regions simultaneously
+- Validate system state before and after changes
+- Collect and aggregate results from distributed cloud resources
+- Integrate with external systems (like ServiceNow)
+
+**Your use case might be different** - and that's exactly what CloudOpsTools is designed for. Whether you're:
+- Running compliance audits across your cloud estate
+- Deploying configuration changes to hundreds of instances
+- Collecting inventory data from multiple cloud providers
+- Executing custom remediation scripts
+- Orchestrating complex multi-step operations
+
+CloudOpsTools provides the infrastructure to execute your scripts reliably and at scale.
 
 ## Overview
 
-PCM-Ops Tools is a unified multi-cloud operations platform built with FastAPI, designed to standardize operations across AWS, Azure, GCP, and ServiceNow. The application serves both API endpoints and web interface from a single FastAPI process on port 8500.
+CloudOpsTools is a unified multi-cloud operations platform built with FastAPI, designed to standardize script execution and operations across AWS, Azure, GCP, and ServiceNow. The application serves both API endpoints and web interface from a single FastAPI process on port 8500.
 
 ## Current Status
 
-- **Unified FastAPI Application**: ✅ Single process serving REST APIs and web UI
-- **AWS Tools**: ✅ Linux QC Patching (Prep/Post), SFT Fixer, Script Runner (backend service)
-- **Security Features**: ✅ Phase 1 security fixes with feature flag controls
+- **Multi-Cloud Script Execution Framework**: ✅ Core engine for executing arbitrary scripts across cloud providers
+- **AWS Implementation**: ✅ Full AWS support with multi-account/region script execution via SSM
+- **Example Workflows**: ✅ Linux QC Patching (Prep/Post), SFT Fixer as reference implementations
+- **Security Features**: ✅ Phase 1 security with XSS, CSRF, encryption, and feature flag controls
 - **Session Management**: ✅ Server-side session storage with encryption support
-- **Credential Management**: ✅ Secure AWS credential validation and caching
-- **Web Interface**: ✅ Bootstrap 5 UI with HTMX for dynamic updates
-- **Additional Providers**: 📝 Planned (Azure, GCP, ServiceNow integrations)
+- **Credential Management**: ✅ Secure AWS credential validation and caching (COM/GOV clouds)
+- **Web Interface**: ✅ Bootstrap 5 UI with HTMX for dynamic workflow execution
+- **Additional Providers**: 📝 Planned (Azure, GCP script execution engines)
 
 ## Architecture
 
@@ -117,7 +142,22 @@ The application will be available at: http://localhost:8500
 
 ## Features
 
-### Current Implementation
+### Framework Capabilities ✅
+
+#### **Multi-Cloud Script Execution Engine**
+- **AWS Script Runner**: Execute arbitrary scripts across multiple AWS accounts and regions via SSM
+- **Multi-Account Support**: Discover and target instances across entire AWS Organizations
+- **Region Flexibility**: Execute scripts in specific regions or across all available regions
+- **Async Operations**: Non-blocking execution using `aiobotocore` for high performance and scalability
+- **Result Aggregation**: Collect and consolidate execution results from distributed resources
+- **State Tracking**: Monitor execution status, retry failed executions, and maintain audit trails
+
+#### **Example Workflow Implementations** (Templates for Your Use Cases)
+- **Linux QC Patching Prep**: Pre-patching validation and preparation workflow
+- **Linux QC Patching Post**: Post-patching validation and reporting workflow
+- **SFT Fixer**: ServiceNow field validation and correction workflow
+
+These are **reference implementations** showing how to build your own workflows using the framework.
 
 #### **Security Features** ✅
 - **XSS Protection**: Input validation, security headers, content security policy
@@ -127,28 +167,52 @@ The application will be available at: http://localhost:8500
 - **Security Logging**: Dedicated security event logging with structured format
 - **Feature Flags**: Safe rollout/rollback controls for all security features
 
-#### **AWS Tools** ✅
-- **Linux QC Patching Prep**: Pre-patching validation and preparation
-- **Linux QC Patching Post**: Post-patching validation and reporting  
-- **SFT Fixer**: ServiceNow field validation and correction
-- **Script Runner**: Multi-account script execution via SSM (backend service)
-- **Async Operations**: Non-blocking AWS API calls using `aiobotocore` for high performance
-
 #### **Core Platform** ✅
 - **Unified FastAPI Application**: Single process serving APIs and web UI
 - **Dynamic Provider Discovery**: Automatic registration of provider tools
 - **Session Management**: Server-side sessions with 30-minute timeout
-- **Credential Management**: Secure AWS credential validation for COM/GOV clouds
-- **Database**: SQLite with SQLAlchemy 2.0 models
+- **Credential Management**: Secure AWS credential validation for COM/GOV clouds (with Azure/GCP support planned)
+- **Database**: SQLite with SQLAlchemy 2.0 models for execution tracking and state management
 - **Web Interface**: Bootstrap 5 UI with HTMX for dynamic updates
 
 ### Planned Features 📝
 
-- **Azure Integration**: Azure resource management tools
-- **GCP Integration**: Google Cloud Platform operations
-- **ServiceNow Integration**: Enhanced ServiceNow automation
-- **Multi-Cloud Dashboards**: Unified view across cloud providers
-- **Advanced Reporting**: Cross-cloud resource and cost reporting
+- **Azure Script Execution Engine**: Execute scripts across Azure subscriptions and resource groups
+- **GCP Script Execution Engine**: Execute scripts across GCP projects and regions
+- **ServiceNow Integration**: Enhanced ServiceNow automation and change management
+- **Multi-Cloud Dashboards**: Unified execution monitoring across cloud providers
+- **Advanced Reporting**: Cross-cloud execution analytics and cost reporting
+
+## Building Your Own Workflows
+
+CloudOpsTools is designed to be **extended with your own workflows**. The included patching workflows serve as templates showing the framework's capabilities.
+
+### How to Create a Custom Workflow
+
+1. **Define Your Script**: Write the shell/Python/PowerShell script you want to execute
+2. **Create a Workflow Module**: Follow the pattern in `backend/web/workflows/`
+3. **Configure Targeting**: Specify which accounts, regions, and instance criteria to target
+4. **Execute**: Use the Script Runner backend to execute across your cloud infrastructure
+5. **Collect Results**: Aggregate and analyze execution results from the database
+
+### Example Use Cases
+
+- **Security Compliance Audits**: Run security assessment scripts across all instances
+- **Configuration Drift Detection**: Compare actual vs. expected configurations
+- **Log Collection**: Gather specific logs from distributed systems
+- **Performance Tuning**: Execute optimization scripts based on metrics
+- **Disaster Recovery Testing**: Validate backup and recovery procedures
+- **Custom Automation**: Any repeatable task that needs to run at scale
+
+### Workflow Architecture
+
+Each workflow consists of:
+- **Web UI** (`backend/web/workflows/your_workflow.py`): User interface for configuration
+- **Script Definition**: The actual script(s) to execute on target instances
+- **Execution Logic**: Uses Script Runner service to execute across cloud resources
+- **Result Processing**: Custom logic to interpret and display execution results
+
+See the existing workflows in `backend/web/workflows/` as templates for building your own.
 
 ## Configuration
 
