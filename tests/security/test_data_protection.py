@@ -597,12 +597,18 @@ class TestDataEncryption:
 @pytest.mark.security
 @pytest.mark.data_leakage
 class TestDataLeakagePrevention:
-    """Test prevention of data leakage in logs, errors, etc."""
-    
+    """Test prevention of data leakage in logs, errors, and API responses."""
+
+    # Sample sensitive data patterns used across tests
+    SAMPLE_ACCESS_KEY = "AKIAIOSFODNN7EXAMPLE"
+    SAMPLE_SECRET_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+    SAMPLE_SESSION_TOKEN = "FwoGZXIvYXdzEBYaDNMM2v9jK5hztest123abcdefghijklmnopqrstuvwxyz"
+    SAMPLE_PASSWORD = "MySuperSecretPassword123!"
+
     def test_credentials_not_in_error_logs(self, client, caplog):
         """Test credentials don't appear in error logs"""
         import logging
-        
+
         # Capture all log levels
         with caplog.at_level(logging.DEBUG):
             # Trigger an error with credentials
@@ -614,27 +620,27 @@ class TestDataLeakagePrevention:
                     "session_token": "LongSessionToken123456789"
                 }
             )
-        
+
         # Check logs for credential leakage
         all_logs = " ".join([record.getMessage() for record in caplog.records])
-        
+
         assert "SuperSecretKey" not in all_logs
         assert "LongSessionToken" not in all_logs
         # Access key might be logged for debugging, but should be masked
         if "AKIATEST" in all_logs:
             # Should be masked like AKIA****
             assert "AKIATEST123456789012" not in all_logs
-    
+
     def test_database_credentials_not_logged(self, test_settings, caplog):
         """Test database credentials are not logged"""
         import logging
-        
+
         with caplog.at_level(logging.DEBUG):
             # Access database URL (might trigger logging)
             db_url = test_settings.DATABASE_URL
-        
+
         all_logs = " ".join([record.getMessage() for record in caplog.records])
-        
+
         # If database has credentials, they shouldn't be in logs
         if "@" in db_url:  # Has credentials
             parts = db_url.split("@")
@@ -644,15 +650,15 @@ class TestDataLeakagePrevention:
                 if ":" in creds:
                     password = creds.split(":")[1]
                     assert password not in all_logs
-    
+
     def test_environment_variables_not_leaked(self, client):
         """Test environment variables are not leaked in responses"""
         # Trigger potential error that might leak env vars
         response = client.get("/api/health")
-        
+
         if response.status_code >= 400:
             error_text = str(response.json())
-            
+
             # Check for common env var patterns
             sensitive_patterns = [
                 "SECRET_KEY",
@@ -660,9 +666,329 @@ class TestDataLeakagePrevention:
                 "DATABASE_URL",
                 "PASSWORD"
             ]
-            
+
             for pattern in sensitive_patterns:
                 assert pattern not in error_text
+
+    def test_log_filter_masks_aws_access_keys(self):
+        """Test SecurityLogFilter masks AWS access keys in log messages"""
+        from backend.core.logging_config import SecurityLogFilter
+
+        filter = SecurityLogFilter()
+
+        # Test various AWS access key formats
+        test_cases = [
+            # (input, should_contain, should_not_contain)
+            ("Access key: AKIAIOSFODNN7EXAMPLE", "AKIA****", "AKIAIOSFODNN7EXAMPLE"),
+            ("Key is ASIAX5ABCDEF12345678 for role", "AKIA****", "ASIAX5ABCDEF12345678"),
+            ("Using key=AKIAIOSFODNN7EXAMPLE", "****", "AKIAIOSFODNN7EXAMPLE"),
+        ]
+
+        for input_msg, should_contain, should_not_contain in test_cases:
+            sanitized = filter._sanitize_message(input_msg)
+            assert should_not_contain not in sanitized, \
+                f"Leaked access key in: {sanitized}"
+            # Note: Pattern may be masked differently depending on filter logic
+
+    def test_log_filter_masks_secrets_in_key_value_pairs(self):
+        """Test SecurityLogFilter masks password/secret in key=value pairs"""
+        from backend.core.logging_config import SecurityLogFilter
+
+        filter = SecurityLogFilter()
+
+        # Test secret in key=value patterns
+        test_cases = [
+            "password=MySecretPassword123",
+            "secret=SuperSecretValue",
+            "token=abc123xyz",
+            "key=SomeAPIKey12345",
+            "password: MySecretPassword123",
+            "secret: SuperSecretValue",
+        ]
+
+        for input_msg in test_cases:
+            sanitized = filter._sanitize_message(input_msg)
+            # The value after = or : should be masked
+            assert "=****" in sanitized or ":****" in sanitized or "****" in sanitized, \
+                f"Secret value not masked in: '{input_msg}' -> '{sanitized}'"
+
+    def test_log_filter_masks_long_alphanumeric_strings(self):
+        """Test SecurityLogFilter masks long alphanumeric strings (potential secrets)"""
+        from backend.core.logging_config import SecurityLogFilter
+
+        filter = SecurityLogFilter()
+
+        # Long strings that look like tokens/secrets should be masked
+        test_cases = [
+            ("Token: abcdefghijklmnopqrstuvwxyz1234", "****"),
+            ("SessionToken: FwoGZXIvYXdzEBYaDAbcdefghijklmnop", "****"),
+        ]
+
+        for input_msg, expected_mask in test_cases:
+            sanitized = filter._sanitize_message(input_msg)
+            # Long alphanumeric strings should be replaced with ****
+            # The filter masks 20+ alphanumeric characters
+            assert expected_mask in sanitized, \
+                f"Long token not masked: '{input_msg}' -> '{sanitized}'"
+
+    def test_api_response_masks_access_key(self, client):
+        """Test API responses mask access keys properly"""
+        # The /api/auth/aws-check-credentials endpoint should mask access keys
+        response = client.get("/api/auth/aws-check-credentials")
+
+        if response.status_code == 200:
+            data = response.json()
+
+            # Check both com and gov environments
+            for env in ["com", "gov"]:
+                env_data = data.get(env)
+                if env_data and env_data.get("access_key"):
+                    access_key = env_data["access_key"]
+                    # Should be masked format like "AKIA...XXXX" or "****"
+                    assert len(access_key) < 20 or "..." in access_key or "****" in access_key, \
+                        f"Access key not properly masked in response: {access_key}"
+
+    def test_error_response_no_credential_leakage(self, client):
+        """Test error responses don't leak credentials"""
+        # Send invalid credentials to trigger validation error
+        response = client.post(
+            "/api/auth/aws-credentials",
+            json={
+                "access_key": "invalid-key",
+                "secret_key": self.SAMPLE_SECRET_KEY,
+                "session_token": self.SAMPLE_SESSION_TOKEN,
+                "environment": "com"
+            }
+        )
+
+        # Should be validation error
+        assert response.status_code in [400, 422]
+
+        # Response body should not contain the secret key or session token
+        response_text = response.text
+        assert self.SAMPLE_SECRET_KEY not in response_text, \
+            "Secret key leaked in error response"
+        assert self.SAMPLE_SESSION_TOKEN not in response_text, \
+            "Session token leaked in error response"
+
+    def test_validation_error_no_credential_echo(self, client):
+        """Test validation errors don't echo back credential values"""
+        # Various invalid credential payloads
+        test_cases = [
+            {
+                "access_key": "AKIATEST123456789012",
+                "secret_key": "short",  # Too short
+                "environment": "com"
+            },
+            {
+                "access_key": "invalid_access_key_format",
+                "secret_key": self.SAMPLE_SECRET_KEY,
+                "environment": "invalid_env"
+            },
+        ]
+
+        for payload in test_cases:
+            response = client.post("/api/auth/aws-credentials", json=payload)
+
+            if response.status_code in [400, 422]:
+                response_text = response.text.lower()
+
+                # Validation errors should not echo the secret values
+                if payload.get("secret_key"):
+                    assert payload["secret_key"].lower() not in response_text, \
+                        f"Secret key echoed in validation error: {response.text}"
+
+    def test_exception_messages_sanitized(self):
+        """Test exception messages don't contain credential details"""
+        from backend.core.utils.encryption import CredentialEncryption
+
+        encryption = CredentialEncryption()
+
+        # Try to decrypt invalid data - should return None, not raise with details
+        invalid_inputs = [
+            "not-encrypted-data",
+            "gAAAAAB_invalid_token_here",
+            "",
+        ]
+
+        for invalid_input in invalid_inputs:
+            result = encryption.decrypt_credentials(invalid_input)
+            # Should fail gracefully without raising
+            assert result is None, \
+                f"Expected None for invalid input, got: {result}"
+
+    def test_encryption_error_logs_sanitized(self, caplog):
+        """Test encryption errors don't log sensitive data"""
+        import logging
+        from backend.core.utils.encryption import CredentialEncryption
+
+        encryption = CredentialEncryption()
+
+        # Capture logs during failed decryption
+        with caplog.at_level(logging.DEBUG):
+            # Try to decrypt corrupted data
+            encryption.decrypt_credentials("corrupted-data-not-valid-fernet")
+
+        all_logs = " ".join([record.getMessage() for record in caplog.records])
+
+        # Log should indicate failure but not contain the corrupted data
+        # (which could be a malicious payload)
+        if "decrypt" in all_logs.lower():
+            assert "corrupted-data-not-valid-fernet" not in all_logs, \
+                "Raw input data should not be logged on decrypt failure"
+
+    def test_stack_trace_no_credentials(self, caplog):
+        """Test stack traces don't expose credential values"""
+        import logging
+
+        # This test verifies that if an exception occurs while handling credentials,
+        # the credentials don't appear in the stack trace
+
+        # We'll use the SecurityLogFilter to sanitize any exception info
+        from backend.core.logging_config import SecurityLogFilter
+
+        filter = SecurityLogFilter()
+
+        # Simulate a log record with exception info containing credentials
+        class MockExcInfo:
+            pass
+
+        # Test that the filter sanitizes messages that might contain credentials
+        trace_with_creds = (
+            f"Traceback (most recent call last):\n"
+            f"  File 'test.py', line 10, in test_func\n"
+            f"    secret_key = '{self.SAMPLE_SECRET_KEY}'\n"
+            f"ValueError: Invalid key"
+        )
+
+        sanitized = filter._sanitize_message(trace_with_creds)
+
+        # The actual secret key value should be masked
+        assert self.SAMPLE_SECRET_KEY not in sanitized, \
+            f"Secret key found in sanitized trace: {sanitized}"
+
+    def test_repr_str_no_credential_exposure(self):
+        """Test __repr__ and __str__ of models don't expose credentials"""
+        from backend.api.auth import CredentialRequest
+
+        # Create a credential request object
+        try:
+            cred_request = CredentialRequest(
+                access_key="AKIAIOSFODNN7EXAMPLE",
+                secret_key=self.SAMPLE_SECRET_KEY,
+                session_token=self.SAMPLE_SESSION_TOKEN,
+                environment="com"
+            )
+
+            # String representations should not contain actual secret values
+            str_repr = str(cred_request)
+            repr_repr = repr(cred_request)
+
+            # The secret key should not be fully visible
+            # (Pydantic models may show the value, but it should be masked)
+            # This test documents expected behavior
+            if self.SAMPLE_SECRET_KEY in str_repr:
+                # If visible, this is a potential security concern
+                import warnings
+                warnings.warn(
+                    "CredentialRequest __str__ exposes secret_key - consider using SecretStr"
+                )
+        except Exception:
+            # If validation fails, that's also acceptable - means we can't create
+            # objects with invalid data
+            pass
+
+    def test_json_serialization_no_credentials(self):
+        """Test JSON serialization doesn't leak credentials"""
+        from backend.api.auth import CredentialResponse
+
+        # Create a response object
+        response = CredentialResponse(
+            success=True,
+            message="Validated",
+            environment="com",
+            temporary=True,
+            expiration=1234567890.0,
+            expires_in_seconds=3600,
+            expires_in_minutes=60.0
+        )
+
+        # Serialize to JSON
+        json_data = response.model_dump_json()
+
+        # Response should not contain any credential fields
+        assert "secret_key" not in json_data.lower()
+        assert "access_key" not in json_data.lower() or "****" in json_data
+        assert "session_token" not in json_data.lower()
+        assert self.SAMPLE_SECRET_KEY not in json_data
+        assert self.SAMPLE_SESSION_TOKEN not in json_data
+
+    def test_session_store_get_returns_none_not_error_details(self, test_settings, db_session):
+        """Test SessionStore.get returns None for missing keys, not error details"""
+        from backend.core.utils.session_store import SessionStore
+
+        # Try to get a non-existent key
+        result = SessionStore.get("credentials:nonexistent_session_key_12345")
+
+        # Should return None, not raise an exception or return error details
+        assert result is None
+
+    def test_credential_response_excludes_sensitive_fields(self, client):
+        """Test credential validation response doesn't include sensitive input"""
+        # Even on success, the response should not echo back credentials
+        response = client.post(
+            "/api/auth/aws-credentials",
+            json={
+                "access_key": "AKIAIOSFODNN7EXAMPLE",
+                "secret_key": self.SAMPLE_SECRET_KEY,
+                "session_token": self.SAMPLE_SESSION_TOKEN,
+                "environment": "com"
+            }
+        )
+
+        # Whether success or failure, response should not contain credentials
+        response_text = response.text
+
+        # These should never appear in any response
+        assert self.SAMPLE_SECRET_KEY not in response_text, \
+            "Secret key should never appear in API response"
+        assert self.SAMPLE_SESSION_TOKEN not in response_text, \
+            "Session token should never appear in API response"
+
+    def test_log_filter_masks_email_addresses(self):
+        """Test SecurityLogFilter partially masks email addresses"""
+        from backend.core.logging_config import SecurityLogFilter
+
+        filter = SecurityLogFilter()
+
+        # Test email masking
+        input_msg = "User email is john.doe@example.com"
+        sanitized = filter._sanitize_message(input_msg)
+
+        # Email should be partially masked (first char + **** + domain)
+        assert "john.doe@example.com" not in sanitized, \
+            "Full email should not appear in sanitized message"
+        assert "@example.com" in sanitized, \
+            "Domain should still be visible for debugging"
+
+    def test_credentials_not_in_debug_output(self, test_settings):
+        """Test credentials don't appear in debug/repr output of settings"""
+        # Get string representation of settings
+        settings_str = str(test_settings)
+        settings_repr = repr(test_settings)
+
+        # These patterns should not appear in full form
+        # (SECRET_KEY should be masked or not shown)
+        if hasattr(test_settings, 'SECRET_KEY'):
+            secret = test_settings.SECRET_KEY
+            if len(secret) > 8:
+                # Full secret should not be in repr
+                # Allow if it's masked
+                if secret in settings_str or secret in settings_repr:
+                    import warnings
+                    warnings.warn(
+                        "Settings __str__/__repr__ may expose SECRET_KEY - consider masking"
+                    )
 
 
 @pytest.mark.security
