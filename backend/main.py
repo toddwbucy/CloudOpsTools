@@ -54,13 +54,15 @@ app = FastAPI(
 # =============================================================================
 
 # Session middleware for credential storage
+# Use HTTPS-only cookies in production for security
+is_production = settings.ENVIRONMENT.lower() == "production"
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.SECRET_KEY,
     session_cookie="cloudopstools_session",
     max_age=settings.SESSION_LIFETIME_MINUTES * 60,
-    same_site="lax",
-    https_only=False,  # Set to True in production
+    same_site="strict" if is_production else "lax",
+    https_only=is_production,
 )
 
 # CORS middleware for frontend access
@@ -119,7 +121,7 @@ async def root():
     """
     return {
         "name": "CloudOpsTools API",
-        "version": "1.0.0",
+        "version": settings.VERSION,
         "docs": "/docs",
         "redoc": "/redoc",
         "openapi": "/openapi.json",

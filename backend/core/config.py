@@ -105,11 +105,11 @@ class Settings(BaseSettings):
         Returns:
             Dictionary with credentials for the specified provider/environment.
             For AWS with environment specified:
-                {"access_key_id": "...", "secret_access_key": "..."}
+                {"access_key_id": "...", "secret_access_key": "...", "session_token": "..."}
             For AWS without environment (all environments):
                 {
-                    "com": {"access_key_id": "...", "secret_access_key": "..."},
-                    "gov": {"access_key_id": "...", "secret_access_key": "..."}
+                    "com": {"access_key_id": "...", "secret_access_key": "...", "session_token": "..."},
+                    "gov": {"access_key_id": "...", "secret_access_key": "...", "session_token": "..."}
                 }
 
         Raises:
@@ -144,8 +144,8 @@ class Settings(BaseSettings):
             Nested dictionary structure:
             {
                 "aws": {
-                    "com": {"access_key_id": "...", "secret_access_key": "..."},
-                    "gov": {"access_key_id": "...", "secret_access_key": "..."}
+                    "com": {"access_key_id": "...", "secret_access_key": "...", "session_token": "..."},
+                    "gov": {"access_key_id": "...", "secret_access_key": "...", "session_token": "..."}
                 },
                 # Future: "azure": {...}, "gcp": {...}
             }
@@ -155,10 +155,12 @@ class Settings(BaseSettings):
                 "com": {
                     "access_key_id": self.AWS_ACCESS_KEY_ID_COM,
                     "secret_access_key": self.AWS_SECRET_ACCESS_KEY_COM,
+                    "session_token": self.AWS_SESSION_TOKEN_COM,
                 },
                 "gov": {
                     "access_key_id": self.AWS_ACCESS_KEY_ID_GOV,
                     "secret_access_key": self.AWS_SECRET_ACCESS_KEY_GOV,
+                    "session_token": self.AWS_SESSION_TOKEN_GOV,
                 },
             },
             # Future: "azure": {...}, "gcp": {...}
