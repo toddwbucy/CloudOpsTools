@@ -164,3 +164,112 @@ Expected Results:
 Status: Code structure verified. Tests ready for execution outside sandbox.
 
 === END subtask-5-1 ===
+
+=== SESSION: subtask-5-2 ===
+
+Task: Manual testing of rate limit tiers (auth, execution, read)
+
+Implementation:
+Created comprehensive manual testing script and documentation for all rate limit tiers.
+
+1. Created Manual Testing Script (scripts/test_rate_limits.sh):
+   - Executable bash script for systematic rate limit verification
+   - Tests all three tiers with proper request counts
+   - Verifies HTTP 429 status codes and Retry-After headers
+   - Tests graceful degradation (app continues serving other requests)
+   - Checks health endpoint for rate limiting metrics
+   - Color-coded output for easy pass/fail identification
+
+2. Rate Limit Tier Testing:
+
+   AUTH TIER (10/minute):
+   Endpoint: POST /api/auth/aws-credentials
+   Test: Make 12 requests rapidly, expect 429 on request 11
+   Command:
+     for i in {1..12}; do
+       curl -s -o /dev/null -w "Request $i: HTTP %{http_code}\n" \
+         -X POST http://localhost:8500/api/auth/aws-credentials \
+         -H "Content-Type: application/json" \
+         -d '{"access_key":"AKIAIOSFODNN7EXAMPLE","secret_key":"wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY","environment":"com"}'
+     done
+   Expected: Requests 1-10 return HTTP 200, request 11+ returns HTTP 429
+
+   EXECUTION TIER (5/minute):
+   Endpoint: POST /api/tools/{tool_id}/execute
+   Test: Make 7 requests rapidly, expect 429 on request 6
+   Command:
+     for i in {1..7}; do
+       curl -s -o /dev/null -w "Request $i: HTTP %{http_code}\n" \
+         -X POST http://localhost:8500/api/tools/1/execute
+     done
+   Expected: Requests 1-5 return HTTP 200, request 6+ returns HTTP 429
+
+   READ TIER (100/minute):
+   Endpoint: GET /api/tools/
+   Test: Make 103 requests rapidly, expect 429 on request 101
+   Command:
+     for i in {1..103}; do
+       curl -s -o /dev/null -w "Request $i: HTTP %{http_code}\n" \
+         http://localhost:8500/api/tools/
+     done
+   Expected: Requests 1-100 return HTTP 200, request 101+ returns HTTP 429
+
+3. Retry-After Header Verification:
+   Command to verify header:
+     curl -i -X POST http://localhost:8500/api/auth/aws-credentials \
+       -H "Content-Type: application/json" \
+       -d '{"access_key":"AKIAIOSFODNN7EXAMPLE","secret_key":"wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY","environment":"com"}'
+
+   Expected response headers (after limit exceeded):
+     HTTP/1.1 429 Too Many Requests
+     retry-after: <seconds>
+     content-type: text/plain; charset=utf-8
+
+   The retry-after header contains the number of seconds until the rate limit resets.
+
+4. Graceful Degradation Verification:
+   After hitting rate limit on one endpoint, verify other endpoints still work:
+   Command:
+     curl -s http://localhost:8500/api/health
+     curl -s http://localhost:8500/health
+   Expected: Both return HTTP 200 with JSON health response
+
+5. Health Endpoint Rate Limiting Metrics:
+   Command:
+     curl -s http://localhost:8500/api/health | python3 -m json.tool
+
+   Expected response includes:
+   {
+     "status": "healthy",
+     "services": {
+       "rate_limiting": {
+         "status": "enabled",
+         "storage": {"type": "memory", "healthy": true},
+         "configuration": {
+           "auth_endpoints": "10/minute",
+           "execution_endpoints": "5/minute",
+           "read_endpoints": "100/minute"
+         },
+         "endpoints_protected": {
+           "auth": ["/api/auth/aws-credentials"],
+           "execution": ["/api/tools/{tool_id}/execute"],
+           "read": ["/api/tools/", "/api/tools/{tool_id}"]
+         }
+       }
+     }
+   }
+
+Manual Testing Quick Start:
+   1. Start server: poetry run uvicorn backend.main:app --reload --port 8500
+   2. Run test script: ./scripts/test_rate_limits.sh
+   3. Or run individual tier tests using commands above
+
+Automated Testing Alternative:
+   poetry run pytest tests/test_rate_limiting.py -v
+
+Files Created:
+- scripts/test_rate_limits.sh (executable manual testing script)
+
+Status: Manual testing documentation and script complete. Ready for execution.
+
+=== END subtask-5-2 ===
