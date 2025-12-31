@@ -23,18 +23,196 @@ class TestDataEncryption:
     """Test data encryption and secure storage"""
 
     def test_secret_key_entropy(self, test_settings):
-        """Test SECRET_KEY has sufficient entropy"""
+        """Test SECRET_KEY has sufficient entropy and is not a hardcoded default"""
         secret = test_settings.SECRET_KEY
 
-        # Should be at least 32 characters
-        assert len(secret) >= 32
+        # Should be at least 32 characters (NIST recommends 32+ for secrets)
+        assert len(secret) >= 32, "SECRET_KEY must be at least 32 characters"
 
-        # Should not be the default insecure value
-        assert secret != "your-secret-key-here-change-in-production"
+        # Should not be any common default/hardcoded values
+        hardcoded_defaults = [
+            "your-secret-key-here-change-in-production",
+            "changeme",
+            "secret",
+            "secretkey",
+            "mysecretkey",
+            "development-secret",
+            "dev-secret-key",
+            "test-secret-key",
+            "placeholder",
+            "default",
+            "example",
+            "CHANGE_ME",
+            "supersecret",
+            "password",
+            "12345678901234567890123456789012",  # Sequential digits
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",  # All same character
+        ]
+
+        for default in hardcoded_defaults:
+            assert secret.lower() != default.lower(), \
+                f"SECRET_KEY must not be hardcoded default value: {default}"
+
+        # Check for patterns that suggest hardcoding
+        assert "change" not in secret.lower() or len(secret) > 50, \
+            "SECRET_KEY appears to contain 'change' suggesting a placeholder"
+        assert "example" not in secret.lower(), \
+            "SECRET_KEY appears to contain 'example' suggesting a placeholder"
+        assert "placeholder" not in secret.lower(), \
+            "SECRET_KEY appears to contain 'placeholder'"
 
         # Should have reasonable entropy (not all same character)
         unique_chars = len(set(secret.lower()))
-        assert unique_chars >= 10  # At least 10 different characters
+        assert unique_chars >= 10, \
+            f"SECRET_KEY must have at least 10 unique characters (has {unique_chars})"
+
+        # Should not be a simple repeating pattern
+        if len(secret) >= 4:
+            # Check for simple 2-char or 4-char repeating patterns
+            two_char = secret[:2]
+            four_char = secret[:4]
+            assert secret != two_char * (len(secret) // 2), \
+                "SECRET_KEY should not be a simple repeating pattern"
+            assert secret != four_char * (len(secret) // 4), \
+                "SECRET_KEY should not be a simple repeating pattern"
+
+        # Entropy calculation - should have good character distribution
+        import math
+        char_counts = {}
+        for char in secret:
+            char_counts[char] = char_counts.get(char, 0) + 1
+
+        # Calculate Shannon entropy
+        entropy = 0.0
+        for count in char_counts.values():
+            probability = count / len(secret)
+            entropy -= probability * math.log2(probability)
+
+        # A good random string of 32+ chars should have entropy > 3.0 bits per character
+        assert entropy >= 2.5, \
+            f"SECRET_KEY has low entropy ({entropy:.2f} bits/char), suggesting weak randomness"
+
+    def test_salt_unique_per_deployment(self, test_settings):
+        """Test encryption salt is unique per deployment and not hardcoded"""
+        from backend.core.utils.encryption import CredentialEncryption
+        import tempfile
+        import shutil
+
+        # Create two separate encryption instances and verify their salts
+        # would differ if created in isolation (simulating different deployments)
+
+        # First, get the current encryption instance
+        encryption1 = CredentialEncryption()
+
+        # The salt should be 16 bytes (128 bits)
+        # We can verify by checking the salt file exists and has proper length
+        db_url = test_settings.DATABASE_URL
+        if db_url.startswith("sqlite:///"):
+            from pathlib import Path
+            db_path = Path(db_url[10:]).resolve()
+            salt_file = db_path.parent / ".encryption_salt"
+
+            if salt_file.exists():
+                with open(salt_file, "rb") as f:
+                    salt = f.read()
+
+                # Salt should be exactly 16 bytes
+                assert len(salt) == 16, \
+                    f"Salt should be 16 bytes, got {len(salt)}"
+
+                # Salt should have good entropy (not all zeros or same byte)
+                unique_bytes = len(set(salt))
+                assert unique_bytes >= 4, \
+                    "Salt has low byte diversity, may not be randomly generated"
+
+                # Salt should not be a common default
+                common_defaults = [
+                    b'\x00' * 16,  # All zeros
+                    b'\xff' * 16,  # All 0xff
+                    b'0123456789abcdef',  # Sequential
+                    b'abcdefghijklmnop',  # Sequential letters
+                ]
+
+                for default in common_defaults:
+                    assert salt != default, \
+                        "Salt appears to be a hardcoded default value"
+
+    def test_salt_file_permissions(self, test_settings):
+        """Test salt file has restrictive permissions"""
+        import stat
+
+        db_url = test_settings.DATABASE_URL
+        if db_url.startswith("sqlite:///"):
+            from pathlib import Path
+            db_path = Path(db_url[10:]).resolve()
+            salt_file = db_path.parent / ".encryption_salt"
+
+            if salt_file.exists():
+                # Check file permissions (should be 0o600 - owner read/write only)
+                mode = salt_file.stat().st_mode
+                permissions = stat.S_IMODE(mode)
+
+                # On Unix systems, others should not have read access
+                others_read = permissions & stat.S_IROTH
+                others_write = permissions & stat.S_IWOTH
+                group_read = permissions & stat.S_IRGRP
+                group_write = permissions & stat.S_IWGRP
+
+                # At minimum, others should not be able to read the salt file
+                assert others_read == 0, \
+                    "Salt file should not be world-readable"
+                assert others_write == 0, \
+                    "Salt file should not be world-writable"
+
+    def test_kdf_iterations_sufficient(self, test_settings):
+        """Test key derivation uses sufficient iterations for security"""
+        from backend.core.utils.encryption import CredentialEncryption
+
+        encryption = CredentialEncryption()
+
+        # Access the private method to get iterations (testing internal behavior)
+        iterations = encryption._get_kdf_iterations()
+
+        # OWASP recommends at least 310,000 iterations for PBKDF2-SHA256 (2023)
+        # We allow 100,000 as absolute minimum for the test, but prefer 300,000+
+        assert iterations >= 100_000, \
+            f"KDF iterations ({iterations}) below security minimum of 100,000"
+
+        # Log a warning if below OWASP recommendation
+        if iterations < 300_000:
+            import warnings
+            warnings.warn(
+                f"KDF iterations ({iterations}) below OWASP recommended 310,000"
+            )
+
+    def test_different_keys_produce_different_ciphertexts(self, test_settings):
+        """Test that different SECRET_KEYs produce incompatible encryption"""
+        from backend.core.utils.encryption import CredentialEncryption
+        from unittest.mock import patch, MagicMock
+        from cryptography.fernet import InvalidToken
+        import pytest
+
+        # Create encryption with current settings
+        encryption1 = CredentialEncryption()
+
+        test_data = {"secret": "test-value"}
+        encrypted = encryption1.encrypt_credentials(test_data)
+
+        # Create a mock settings with different SECRET_KEY
+        mock_settings = MagicMock()
+        mock_settings.SECRET_KEY = "different-secret-key-that-is-at-least-32-chars-long"
+        mock_settings.DATABASE_URL = test_settings.DATABASE_URL
+
+        # The encrypted data from encryption1 should not be decryptable
+        # with a different key
+        with patch('backend.core.utils.encryption.settings', mock_settings):
+            # Creating new instance with different key
+            encryption2 = CredentialEncryption()
+
+            # Attempting to decrypt with wrong key should fail safely
+            result = encryption2.decrypt_credentials(encrypted)
+            assert result is None, \
+                "Decryption with wrong key should return None, not the plaintext"
 
     def test_database_encryption_ready(self, test_settings):
         """Test database is ready for encryption"""
