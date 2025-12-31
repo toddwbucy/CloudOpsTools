@@ -1,0 +1,408 @@
+{
+  "feature": "API Rate Limiting Implementation",
+  "workflow_type": "feature",
+  "workflow_rationale": "This is a new feature implementation adding production-critical security infrastructure. While addressing technical debt, it introduces new functionality (rate limiting middleware, configuration, metrics) rather than refactoring existing code or fixing bugs. The implementation requires architectural decisions around storage backends, configuration patterns, and tiered limit strategies.",
+  "phases": [
+    {
+      "id": "phase-1-foundation",
+      "name": "Foundation Setup",
+      "type": "setup",
+      "description": "Install SlowAPI dependency, add rate limit configuration to Settings, initialize limiter in main.py",
+      "depends_on": [],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-1-1",
+          "description": "Add slowapi dependency to pyproject.toml",
+          "service": "main",
+          "files_to_modify": [
+            "pyproject.toml"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "pyproject.toml"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "poetry show slowapi",
+            "expected": "slowapi"
+          },
+          "status": "completed",
+          "notes": "Added slowapi>=0.1.9 dependency and optional redis[hiredis]>=4.5.0 for distributed deployments. Committed as 3388722.",
+          "updated_at": "2025-12-31T04:00:25.659236+00:00"
+        },
+        {
+          "id": "subtask-1-2",
+          "description": "Add rate limit configuration fields to Settings class in backend/core/config.py",
+          "service": "main",
+          "files_to_modify": [
+            "backend/core/config.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/core/config.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "python -c \"from backend.core.config import settings; print(settings.rate_limit_auth_endpoints)\"",
+            "expected": "10/minute"
+          },
+          "status": "completed",
+          "notes": "Added rate limit configuration fields to Settings class in backend/core/config.py. Created backend package structure (__init__.py files). Uses Pydantic Settings with SettingsConfigDict for env file support. Committed as 59c1f29. Note: Verification command could not be run due to sandbox command restrictions, but code follows spec patterns exactly.",
+          "updated_at": "2025-12-31T04:02:53.378811+00:00"
+        },
+        {
+          "id": "subtask-1-3",
+          "description": "Initialize SlowAPI limiter in backend/main.py and add global exception handler",
+          "service": "main",
+          "files_to_modify": [
+            "backend/main.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/main.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "python -c \"from backend.main import app; print(hasattr(app.state, 'limiter'))\"",
+            "expected": "True"
+          },
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase-2-auth-endpoints",
+      "name": "Auth Endpoint Rate Limiting",
+      "type": "implementation",
+      "description": "Apply rate limit decorators to authentication endpoints in backend/api/auth.py",
+      "depends_on": [
+        "phase-1-foundation"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-2-1",
+          "description": "Apply @limiter.limit() decorators to authentication endpoints with Request parameter",
+          "service": "main",
+          "files_to_modify": [
+            "backend/api/auth.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/api/auth.py"
+          ],
+          "verification": {
+            "type": "api",
+            "method": "POST",
+            "url": "http://localhost:8500/api/auth/aws-credentials",
+            "body": {
+              "access_key": "test",
+              "secret_key": "test",
+              "environment": "com"
+            },
+            "note": "Make 11 rapid requests, 11th should return 429",
+            "expected_status": 429
+          },
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase-3-tools-endpoints",
+      "name": "Tools Endpoint Rate Limiting",
+      "type": "implementation",
+      "description": "Apply execution and read rate limits to tools endpoints in backend/api/tools.py",
+      "depends_on": [
+        "phase-1-foundation"
+      ],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-3-1",
+          "description": "Apply execution rate limits (5/minute) to POST /{tool_id}/execute endpoint",
+          "service": "main",
+          "files_to_modify": [
+            "backend/api/tools.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/api/tools.py"
+          ],
+          "verification": {
+            "type": "api",
+            "method": "POST",
+            "url": "http://localhost:8500/api/tools/1/execute",
+            "note": "Make 6 rapid requests, 6th should return 429",
+            "expected_status": 429
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-3-2",
+          "description": "Apply read rate limits (100/minute) to GET / and GET /{tool_id} endpoints",
+          "service": "main",
+          "files_to_modify": [
+            "backend/api/tools.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/api/tools.py"
+          ],
+          "verification": {
+            "type": "api",
+            "method": "GET",
+            "url": "http://localhost:8500/api/tools/",
+            "note": "Make 101 rapid requests, 101st should return 429",
+            "expected_status": 429
+          },
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase-4-observability",
+      "name": "Metrics and Observability",
+      "type": "implementation",
+      "description": "Add rate limit metrics to /api/health endpoint and verify HTTP 429 responses",
+      "depends_on": [
+        "phase-2-auth-endpoints",
+        "phase-3-tools-endpoints"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-4-1",
+          "description": "Integrate rate limiting metrics into existing /api/health endpoint",
+          "service": "main",
+          "files_to_modify": [
+            "backend/main.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "backend/main.py"
+          ],
+          "verification": {
+            "type": "api",
+            "method": "GET",
+            "url": "http://localhost:8500/api/health",
+            "expected_status": 200,
+            "note": "Response should include rate_limiting section with configuration"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-4-2",
+          "description": "Verify HTTP 429 responses include Retry-After header",
+          "service": "main",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "manual",
+            "instructions": "Send 11 requests to /api/auth/aws-credentials, verify 11th returns HTTP 429 with Retry-After header showing seconds to wait"
+          },
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase-5-testing",
+      "name": "Testing and Validation",
+      "type": "integration",
+      "description": "Verify rate limiting behavior, existing tests pass, and graceful degradation",
+      "depends_on": [
+        "phase-4-observability"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-5-1",
+          "description": "Run existing test suite to ensure no regressions",
+          "service": "main",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "command",
+            "command": "poetry run pytest tests/ -v",
+            "expected": "All tests pass"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-5-2",
+          "description": "Manual testing of rate limit tiers (auth, execution, read)",
+          "service": "main",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "manual",
+            "instructions": "Test each tier: (1) Auth endpoints hit limit at 10/min, (2) Execution at 5/min, (3) Read at 100/min. Verify 429 status, Retry-After headers, and app continues serving other requests"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-5-3",
+          "description": "Verify configuration changes apply without code modification",
+          "service": "main",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "manual",
+            "instructions": "Change RATE_LIMIT_AUTH_ENDPOINTS in .env from 10/minute to 5/minute, restart server, verify new limit applies"
+          },
+          "status": "pending"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_phases": 5,
+    "total_subtasks": 11,
+    "services_involved": [
+      "main"
+    ],
+    "parallelism": {
+      "max_parallel_phases": 2,
+      "parallel_groups": [
+        {
+          "phases": [
+            "phase-2-auth-endpoints",
+            "phase-3-tools-endpoints"
+          ],
+          "reason": "Both depend only on phase-1-foundation and modify different files (auth.py vs tools.py)"
+        }
+      ],
+      "recommended_workers": 1,
+      "speedup_estimate": "1.0x (sequential recommended due to integration dependencies)"
+    },
+    "startup_command": "source auto-claude/.venv/bin/activate && python auto-claude/run.py --spec 002 --parallel 1"
+  },
+  "verification_strategy": {
+    "risk_level": "high",
+    "skip_validation": false,
+    "test_creation_phase": "post_implementation",
+    "test_types_required": [
+      "unit",
+      "integration",
+      "e2e"
+    ],
+    "security_scanning_required": false,
+    "staging_deployment_required": false,
+    "acceptance_criteria": [
+      "All existing tests pass",
+      "Auth endpoints rate limited at 10/minute",
+      "Execution endpoints rate limited at 5/minute",
+      "Read endpoints rate limited at 100/minute",
+      "HTTP 429 responses with Retry-After headers",
+      "Rate limit metrics in /api/health endpoint",
+      "Configuration changes apply via environment variables",
+      "No application crashes when limits exceeded"
+    ],
+    "verification_steps": [
+      {
+        "name": "Unit Tests",
+        "command": "poetry run pytest tests/ -v",
+        "expected_outcome": "All tests pass",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Integration Tests - Auth Rate Limit",
+        "command": "for i in {1..11}; do curl -X POST http://localhost:8500/api/auth/aws-credentials -H 'Content-Type: application/json' -d '{\"access_key\":\"test\",\"secret_key\":\"test\",\"environment\":\"com\"}'; done",
+        "expected_outcome": "11th request returns HTTP 429",
+        "type": "integration",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Integration Tests - Execution Rate Limit",
+        "command": "for i in {1..6}; do curl -X POST http://localhost:8500/api/tools/1/execute; done",
+        "expected_outcome": "6th request returns HTTP 429",
+        "type": "integration",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Integration Tests - Read Rate Limit",
+        "command": "for i in {1..101}; do curl http://localhost:8500/api/tools/; done",
+        "expected_outcome": "101st request returns HTTP 429",
+        "type": "integration",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Health Endpoint Metrics",
+        "command": "curl http://localhost:8500/api/health | jq '.services.rate_limiting'",
+        "expected_outcome": "Returns rate limiting configuration and status",
+        "type": "integration",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Retry-After Header Verification",
+        "command": "curl -i -X POST http://localhost:8500/api/auth/aws-credentials (after hitting limit)",
+        "expected_outcome": "Response includes Retry-After header with seconds value",
+        "type": "e2e",
+        "required": true,
+        "blocking": true
+      }
+    ],
+    "reasoning": "High-risk security middleware affecting all API endpoints requires comprehensive testing to ensure legitimate traffic isn't blocked while malicious traffic is properly rate limited"
+  },
+  "qa_acceptance": {
+    "unit_tests": {
+      "required": true,
+      "commands": [
+        "poetry run pytest tests/ -v"
+      ],
+      "minimum_coverage": null
+    },
+    "integration_tests": {
+      "required": true,
+      "commands": [
+        "poetry run pytest tests/integration/ -v"
+      ],
+      "services_to_test": [
+        "main"
+      ]
+    },
+    "e2e_tests": {
+      "required": true,
+      "commands": [],
+      "flows": [
+        "rate-limit-auth-exceeded",
+        "rate-limit-execution-exceeded",
+        "rate-limit-read-exceeded",
+        "retry-after-reset"
+      ]
+    },
+    "browser_verification": {
+      "required": true,
+      "pages": [
+        {
+          "url": "http://localhost:8500/docs",
+          "checks": [
+            "Rate limit information visible in OpenAPI documentation"
+          ]
+        },
+        {
+          "url": "http://localhost:8500/api/health",
+          "checks": [
+            "Returns JSON with rate_limiting metrics"
+          ]
+        }
+      ]
+    },
+    "database_verification": {
+      "required": false,
+      "checks": []
+    }
+  },
+  "qa_signoff": null,
+  "last_updated": "2025-12-31T04:02:53.378839+00:00"
+}

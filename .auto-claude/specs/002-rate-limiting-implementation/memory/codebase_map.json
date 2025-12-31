@@ -1,0 +1,15 @@
+{
+  "discovered_files": {
+    "pyproject.toml": {
+      "description": "pyproject.toml uses poetry with categorized dependencies (FastAPI/web, Database, AWS, Utilities, Logging). Added rate limiting section for slowapi.",
+      "category": "patterns",
+      "discovered_at": "2025-12-31T04:00:25.669452+00:00"
+    },
+    "backend/core/config.py": {
+      "description": "Settings class using Pydantic Settings with SettingsConfigDict. Includes rate_limit_auth_endpoints (10/minute), rate_limit_execution_endpoints (5/minute), rate_limit_read_endpoints (100/minute), and optional redis_url. Global settings instance exported.",
+      "category": "configuration",
+      "discovered_at": "2025-12-31T04:02:53.390163+00:00"
+    }
+  },
+  "last_updated": "2025-12-31T04:02:53.390177+00:00"
+}
