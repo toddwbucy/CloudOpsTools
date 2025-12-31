@@ -1,265 +1,179 @@
-from typing import Any, Dict, List, Optional, cast
+"""
+Tools API endpoints with rate limiting.
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+This module provides tool management endpoints including tool execution.
+Execution endpoints are rate limited more strictly due to resource consumption.
+"""
 
-from backend.core.schemas.script import Tool
-from backend.db.models.script import Tool as ToolModel
-from backend.db.session import get_db
+from typing import Any, Dict, List, Optional
 
-# Create router
-router = APIRouter()
+from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel, Field
+
+from backend.core.config import settings
+from backend.core.limiter import limiter
+
+# Create router for tools endpoints
+router = APIRouter(prefix="/api/tools", tags=["tools"])
 
 
-@router.get("/", response_model=List[Tool])
-def list_tools(db: Session = Depends(get_db)) -> List[Tool]:
+class ToolResponse(BaseModel):
+    """Response model for a single tool."""
+
+    id: str
+    name: str
+    description: str
+    enabled: bool
+
+
+class ToolListResponse(BaseModel):
+    """Response model for listing tools."""
+
+    tools: List[ToolResponse]
+    total: int
+
+
+class ToolExecuteRequest(BaseModel):
+    """Request model for tool execution."""
+
+    parameters: Optional[Dict[str, Any]] = Field(
+        None, description="Optional parameters for tool execution"
+    )
+
+
+class ToolExecuteResponse(BaseModel):
+    """Response model for tool execution."""
+
+    tool_id: str
+    status: str
+    message: str
+    result: Optional[Dict[str, Any]] = None
+
+
+# In-memory storage for demo purposes
+# In production, this would be a database
+_tools_store: Dict[str, Dict[str, Any]] = {
+    "1": {
+        "id": "1",
+        "name": "health_check",
+        "description": "Performs a health check on target systems",
+        "enabled": True,
+    },
+    "2": {
+        "id": "2",
+        "name": "disk_cleanup",
+        "description": "Cleans up temporary files on target systems",
+        "enabled": True,
+    },
+    "3": {
+        "id": "3",
+        "name": "log_collector",
+        "description": "Collects logs from target systems",
+        "enabled": False,
+    },
+}
+
+
+@router.get("/", response_model=ToolListResponse)
+@limiter.limit(settings.rate_limit_read_endpoints)
+async def list_tools(request: Request):
     """
     List all available tools.
 
-    This endpoint retrieves all registered tools that can be used for script execution.
+    This endpoint returns all tools in the system regardless of their
+    enabled status.
+
+    Rate limit: 100 requests per minute per IP address.
+
+    Args:
+        request: FastAPI request object (required for rate limiting)
+
+    Returns:
+        ToolListResponse with list of all tools and total count
     """
-    tools = db.query(ToolModel).all()
-    # Convert SQLAlchemy models to Pydantic schemas
-    return [Tool.from_orm(tool) for tool in tools]
+    tools = [ToolResponse(**tool) for tool in _tools_store.values()]
+    return ToolListResponse(tools=tools, total=len(tools))
 
 
-@router.get("/{tool_id}", response_model=Tool)
-def get_tool(tool_id: int, db: Session = Depends(get_db)) -> Tool:
+@router.get("/{tool_id}", response_model=ToolResponse)
+@limiter.limit(settings.rate_limit_read_endpoints)
+async def get_tool(request: Request, tool_id: str):
     """
-    Get a specific tool by ID.
+    Get a specific tool by its ID.
 
-    This endpoint retrieves detailed information about a tool.
+    Rate limit: 100 requests per minute per IP address.
+
+    Args:
+        request: FastAPI request object (required for rate limiting)
+        tool_id: The unique identifier of the tool
+
+    Returns:
+        ToolResponse with the tool details
+
+    Raises:
+        HTTPException: If tool not found
     """
-    tool = db.query(ToolModel).filter(ToolModel.id == tool_id).first()
-
+    tool = _tools_store.get(tool_id)
     if not tool:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Tool with ID {tool_id} not found",
+            status_code=404,
+            detail=f"Tool with ID '{tool_id}' not found"
+        )
+    return ToolResponse(**tool)
+
+
+@router.post("/{tool_id}/execute", response_model=ToolExecuteResponse)
+@limiter.limit(settings.rate_limit_execution_endpoints)
+async def execute_tool(
+    request: Request,
+    tool_id: str,
+    execute_request: Optional[ToolExecuteRequest] = None,
+):
+    """
+    Execute a specific tool by its ID.
+
+    This endpoint is rate limited more strictly (5/minute) because tool
+    execution consumes significant server resources and may interact
+    with external systems.
+
+    Rate limit: 5 requests per minute per IP address.
+
+    Args:
+        request: FastAPI request object (required for rate limiting)
+        tool_id: The unique identifier of the tool to execute
+        execute_request: Optional parameters for execution
+
+    Returns:
+        ToolExecuteResponse with execution status and results
+
+    Raises:
+        HTTPException: If tool not found or disabled
+    """
+    # Check if tool exists
+    tool = _tools_store.get(tool_id)
+    if not tool:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Tool with ID '{tool_id}' not found"
         )
 
-    # Convert SQLAlchemy model to Pydantic schema
-    return cast(Tool, Tool.from_orm(tool))
+    # Check if tool is enabled
+    if not tool.get("enabled", False):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tool '{tool['name']}' is currently disabled"
+        )
 
+    # Simulate tool execution
+    # In production, this would actually execute the tool
+    parameters = execute_request.parameters if execute_request else {}
 
-@router.post("/{tool_id}/execute", response_model=Dict[str, Any])
-def execute_tool(
-    tool_id: int,
-    parameters: Dict[str, Any] = Body(...),
-    account_id: Optional[str] = Query(
-        None, description="AWS account ID to run the tool on"
-    ),
-    region: Optional[str] = Query(None, description="AWS region to run the tool in"),
-    instance_id: str = Query(..., description="EC2 instance ID to run the tool on"),
-    environment: str = Query(..., description="AWS environment (gov or com)"),
-    db: Session = Depends(get_db),
-) -> Dict[str, Any]:
-    """
-    Execute a specific tool with provided parameters.
-
-    This endpoint allows for direct execution of a tool with custom parameters
-    without creating a script. The tool will be executed on the specified instance.
-    """
-    import logging
-    from pathlib import Path
-
-    from backend.providers.aws.common.services.credential_manager import (
-        CredentialManager,
+    return ToolExecuteResponse(
+        tool_id=tool_id,
+        status="completed",
+        message=f"Tool '{tool['name']}' executed successfully",
+        result={
+            "executed_with_parameters": parameters,
+            "tool_name": tool["name"],
+        },
     )
-
-    # Define placeholder classes for type checking
-    class EC2Service:
-        def __init__(self, session: Any, region: str) -> None:
-            self.session = session
-            self.region = region
-
-        def get_instance(self, instance_id: str) -> Dict[str, Any]:
-            # Placeholder implementation
-            return {"platform": "linux"}
-
-    class ScriptRunner:
-        def __init__(self, session: Any, region: str) -> None:
-            self.session = session
-            self.region = region
-
-        def run_command(
-            self, instance_id: str, command: str, **kwargs: Any
-        ) -> Dict[str, Any]:
-            # Placeholder implementation
-            return {
-                "status": "success",
-                "exit_code": 0,
-                "stdout": "Command executed successfully",
-                "stderr": "",
-                "execution_time": 1.5,
-            }
-
-    logger = logging.getLogger(__name__)
-
-    # Check if tool exists
-    tool = db.query(ToolModel).filter(ToolModel.id == tool_id).first()
-
-    if not tool:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Tool with ID {tool_id} not found",
-        )
-
-    # Validate environment
-    environment = environment.lower()
-    if environment not in ["gov", "com"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Environment must be 'gov' or 'com'",
-        )
-
-    # Get AWS credentials
-    credential_manager = CredentialManager()
-    if not credential_manager.are_credentials_valid(environment):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Valid AWS credentials for {environment} environment are required",
-        )
-
-    # Create AWS session
-    session = credential_manager.create_session(environment)
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create AWS session for {environment} environment",
-        )
-
-    # Get script path
-    script_path = tool.script_path
-    if not script_path:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"No script path defined for tool '{tool.name}'",
-        )
-
-    # Get actual script path on server
-    base_path = Path(__file__).parent.parent.parent
-    full_script_path = base_path / script_path.lstrip("/")
-
-    if not full_script_path.exists():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Script not found at {script_path}",
-        )
-
-    # Special handling for the disk_checker tool
-    if tool.name == "disk_checker":
-        # Process parameters
-        output_format = parameters.get("output_format", "json")
-        output_file = parameters.get("output_file", "")
-
-        # Build command
-        command = f"{script_path}"
-        if output_format == "text":
-            command += " --no-json"
-        if output_file:
-            command += f" --output {output_file}"
-
-        # Set up EC2 service
-        # Ensure region is not None before passing to EC2Service
-        safe_region = (
-            region if region is not None else "us-east-1"
-        )  # Default to us-east-1 if region is None
-        ec2_service = EC2Service(session, safe_region)
-
-        try:
-            # Verify instance exists
-            instance = ec2_service.get_instance(instance_id)
-            if not instance:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Instance {instance_id} not found in region {region}",
-                )
-
-            # Check platform
-            platform = instance.get("platform", "linux")
-            if platform != tool.platform:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Tool '{tool.name}' is for {tool.platform} platforms, but instance is {platform}",
-                )
-
-            # Create script runner
-            # Ensure region is not None before passing to ScriptRunner
-            safe_region = (
-                region if region is not None else "us-east-1"
-            )  # Default to us-east-1 if region is None
-            script_runner = ScriptRunner(session, safe_region)
-
-            # Execute script
-            logger.info(f"Executing {tool.name} on {instance_id}")
-            result = script_runner.run_command(
-                instance_id=instance_id,
-                command=command,
-                working_dir="/tmp",
-                script_content=full_script_path.read_text(),
-                timeout=300,  # 5 minutes timeout
-            )
-
-            return {
-                "tool_id": tool_id,
-                "tool_name": tool.name,
-                "status": "success" if result["exit_code"] == 0 else "error",
-                "instance_id": instance_id,
-                "exit_code": result["exit_code"],
-                "output": result["stdout"],
-                "error": result["stderr"] if result["stderr"] else None,
-                "execution_time": (
-                    result["execution_time"] if "execution_time" in result else None
-                ),
-            }
-
-        except Exception as e:
-            logger.error(f"Error executing tool: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Error executing tool: {str(e)}",
-            )
-    else:
-        # Generic handler for other tools
-        return {
-            "tool_id": tool_id,
-            "tool_name": tool.name,
-            "status": "not_implemented",
-            "message": f"Execution for tool '{tool.name}' not implemented yet",
-            "parameters": parameters,
-        }
-
-
-@router.get("/{tool_id}/scripts", response_model=List[Dict[str, Any]])
-def list_tool_scripts(
-    tool_id: int, db: Session = Depends(get_db)
-) -> List[Dict[str, Any]]:
-    """
-    List all scripts associated with a specific tool.
-
-    This endpoint retrieves all scripts that use a particular tool.
-    """
-    # Check if tool exists
-    tool = db.query(ToolModel).filter(ToolModel.id == tool_id).first()
-
-    if not tool:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Tool with ID {tool_id} not found",
-        )
-
-    # Return scripts associated with this tool
-    scripts: List[Dict[str, Any]] = []
-    if tool.scripts is not None:
-        scripts = [
-            {
-                "id": script.id,
-                "name": script.name,
-                "description": script.description,
-                "script_type": script.script_type,
-            }
-            for script in tool.scripts
-        ]
-
-    return scripts

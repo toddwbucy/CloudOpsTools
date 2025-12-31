@@ -92,6 +92,12 @@ class Settings(BaseSettings):
     # Default provider when not specified in session
     DEFAULT_PROVIDER: str = "aws"
 
+    # Rate limiting configuration
+    rate_limit_auth_endpoints: str = "10/minute"
+    rate_limit_execution_endpoints: str = "5/minute"
+    rate_limit_read_endpoints: str = "100/minute"
+    redis_url: Optional[str] = None  # Optional Redis backend for distributed rate limiting
+
     def get_provider_credentials(
         self, provider: str, environment: Optional[str] = None
     ) -> Dict[str, Any]:

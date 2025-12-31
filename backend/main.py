@@ -18,9 +18,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from starlette.middleware.sessions import SessionMiddleware
 
 from backend.core.config import settings
+from backend.core.limiter import limiter
 from backend.web.workflows import auth, linux_qc_patching_prep, linux_qc_patching_post, sft_fixer
 
 # Configure logger with CloudOpsTools namespace
@@ -47,6 +50,23 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
+)
+
+# =============================================================================
+# Rate Limiting Setup
+# =============================================================================
+
+# Attach limiter to app.state for access in route decorators
+app.state.limiter = limiter
+
+# Add global exception handler for rate limit exceeded errors
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+logger.info(
+    "Rate limiting initialized with configuration: auth=%s, execution=%s, read=%s",
+    settings.rate_limit_auth_endpoints,
+    settings.rate_limit_execution_endpoints,
+    settings.rate_limit_read_endpoints,
 )
 
 # =============================================================================
@@ -105,6 +125,13 @@ app.include_router(
     prefix="/sft-fixer",
     tags=["SFT Fixer"],
 )
+
+# Rate Limiting API routers - demonstration endpoints for rate limiting
+from backend.api.auth import router as api_auth_router
+from backend.api.tools import router as api_tools_router
+
+app.include_router(api_auth_router, prefix="/api", tags=["Rate Limited API"])
+app.include_router(api_tools_router, prefix="/api", tags=["Rate Limited API"])
 
 
 # =============================================================================
