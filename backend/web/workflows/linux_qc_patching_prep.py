@@ -253,7 +253,7 @@ set -e
 echo "=== Process Check ==="
 
 # Check for package manager locks
-BLOCKING_PROCESSES=("yum" "dnf" "apt" "dpkg" "rpm" "zypper")
+BLOCKING_PROCESSES=("yum" "dn" "apt" "dpkg" "rpm" "zypper")
 FOUND_BLOCKING=0
 
 for proc in "${BLOCKING_PROCESSES[@]}"; do
@@ -489,12 +489,12 @@ async def execute_qc_step(
             output=None,
             error=str(e),
             exit_code=None,
-            message=f"QC step execution not yet implemented for this provider",
+            message="QC step execution not yet implemented for this provider",
         )
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to execute QC step: {str(e)}",
+            detail=f"Failed to execute QC step: {e!s}",
         )
 
 
@@ -561,12 +561,12 @@ async def execute_qc_step_batch(
                 {"instance_id": iid, "status": "not_implemented", "error": str(e)}
                 for iid in batch_request.instance_ids
             ],
-            message=f"Batch QC step execution not yet implemented for this provider",
+            message="Batch QC step execution not yet implemented for this provider",
         )
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to execute batch QC step: {str(e)}",
+            detail=f"Failed to execute batch QC step: {e!s}",
         )
 
 
@@ -715,7 +715,7 @@ async def run_all_qc_checks(
                 "error": str(e),
             }
             all_results["overall_ready"] = False
-            all_results["summary"].append(f"{step_name}: ERROR - {str(e)}")
+            all_results["summary"].append(f"{step_name}: ERROR - {e!s}")
 
     all_results["message"] = (
         "Instance is ready for patching"

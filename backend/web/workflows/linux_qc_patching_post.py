@@ -330,7 +330,7 @@ if command -v yum &> /dev/null; then
     echo "Pending updates: $UPDATES packages"
 
 elif command -v dnf &> /dev/null; then
-    echo "Package manager: dnf"
+    echo "Package manager: dn"
 
     # Check for available updates
     UPDATES=$(dnf check-update -q 2>/dev/null | grep -c "^[a-zA-Z]" || echo "0")
@@ -647,7 +647,7 @@ async def execute_post_qc_step(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to execute post-patching QC step: {str(e)}",
+            detail=f"Failed to execute post-patching QC step: {e!s}",
         )
 
 
@@ -719,7 +719,7 @@ async def execute_post_qc_step_batch(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to execute batch post-patching QC step: {str(e)}",
+            detail=f"Failed to execute batch post-patching QC step: {e!s}",
         )
 
 
@@ -868,7 +868,7 @@ async def run_all_post_qc_checks(
                 "error": str(e),
             }
             all_results["overall_healthy"] = False
-            all_results["summary"].append(f"{step_name}: ERROR - {str(e)}")
+            all_results["summary"].append(f"{step_name}: ERROR - {e!s}")
 
     all_results["message"] = (
         "Instance passed all post-patch validations"

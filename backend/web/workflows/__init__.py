@@ -14,4 +14,4 @@ Available modules:
 
 from backend.web.workflows import auth, linux_qc_patching_prep, linux_qc_patching_post, sft_fixer
 
-__all__ = ["auth", "linux_qc_patching_prep", "linux_qc_patching_post", "sft_fixer"]
+__all__ = ["auth", "linux_qc_patching_post", "linux_qc_patching_prep", "sft_fixer"]

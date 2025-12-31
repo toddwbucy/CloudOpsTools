@@ -676,12 +676,12 @@ async def validate_instance(
             instance_id=validation_request.instance_id,
             status="not_implemented",
             agent_status=None,
-            message=f"Instance validation not yet implemented for this provider: {str(e)}",
+            message=f"Instance validation not yet implemented for this provider: {e!s}",
         )
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to validate instance: {str(e)}",
+            detail=f"Failed to validate instance: {e!s}",
         )
 
 
@@ -772,7 +772,7 @@ async def validate_instances_batch(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to validate instances: {str(e)}",
+            detail=f"Failed to validate instances: {e!s}",
         )
 
 
@@ -834,7 +834,7 @@ async def execute_script(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to execute script: {str(e)}",
+            detail=f"Failed to execute script: {e!s}",
         )
 
 
@@ -899,7 +899,7 @@ async def execute_script_batch(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to execute batch script: {str(e)}",
+            detail=f"Failed to execute batch script: {e!s}",
         )
 
 
@@ -960,10 +960,10 @@ async def execute_fix(
             output=None,
             error=str(e),
             exit_code=None,
-            message=f"Fix execution not yet implemented for this provider",
+            message="Fix execution not yet implemented for this provider",
         )
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to execute fix: {str(e)}",
+            detail=f"Failed to execute fix: {e!s}",
         )

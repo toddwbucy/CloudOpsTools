@@ -166,7 +166,7 @@ async def authenticate(
         raise HTTPException(
             status_code=400,
             detail=str(e),
-        )
+        ) from e
     except NotImplementedError as e:
         # Provider validation not yet implemented
         # For development, allow authentication to proceed with session storage
@@ -186,7 +186,7 @@ async def authenticate(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Authentication failed: {str(e)}",
+            detail=f"Authentication failed: {e!s}",
         )
 
 
