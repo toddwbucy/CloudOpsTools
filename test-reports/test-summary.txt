@@ -34,7 +34,7 @@ Next Actions Required:
 4. Target: 100% pass rate before production deployment
 
 Reports Generated:
-None (test run via pytest -q --tb=short)
+None (test run via poetry run pytest -q -m security tests/security/ --tb=short)
 
 Notes:
 ======
