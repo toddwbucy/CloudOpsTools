@@ -1,0 +1,197 @@
+<!-- AWS Shared Change Management Component -->
+<!-- Usage: include "aws/shared/change_management.html" -->
+<!-- Requires: tool_name variable to be set (e.g., 'script-runner' or 'linux-patcher') -->
+
+<div class="card mb-3">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="bi bi-folder-open me-2"></i>Change Management</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <!-- Select/Load Column -->
+            <div class="col-lg-4 mb-3">
+                <div class="card h-100">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0">Select Change</h6>
+                    </div>
+                    <div class="card-body">
+                        <select class="form-select mb-2" id="change-select">
+                            <option value="">Select a change...</option>
+                            {% for change in changes %}
+                            <option value="{{ change.id }}" {% if current_change and current_change.id == change.id %}selected{% endif %}>
+                                {{ change.change_number }} - {{ change.instances|length }} instances
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <button class="btn btn-primary w-100 mb-2" onclick="loadSelectedChange()">
+                            <i class="bi bi-download me-1"></i>Load Change
+                        </button>
+                        <div class="btn-group w-100" role="group">
+                            <button class="btn btn-outline-secondary" onclick="refreshChangeList()">
+                                <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                            </button>
+                            {% if current_change %}
+                            <button class="btn btn-outline-danger" onclick="clearChange()">
+                                <i class="bi bi-x-circle me-1"></i>Clear
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Upload CSV Column -->
+            <div class="col-lg-4 mb-3">
+                <div class="card h-100">
+                    <div class="card-header bg-success text-white">
+                        <h6 class="mb-0">Upload CSV</h6>
+                    </div>
+                    <div class="card-body">
+                        <form id="change-csv-upload-form" method="POST" enctype="multipart/form-data">
+                            <div class="mb-2">
+                                <input type="file" class="form-control" id="change-csv-file" name="file" accept=".csv" required>
+                                <div class="form-text small">Required: change_number, platform, region, account_id, instance_id</div>
+                            </div>
+                            <button type="submit" class="btn btn-success w-100">
+                                <i class="bi bi-upload me-1"></i>Upload CSV
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Manual Entry Column -->
+            <div class="col-lg-4 mb-3">
+                <div class="card h-100">
+                    <div class="card-header bg-warning text-dark">
+                        <h6 class="mb-0">Manual Entry</h6>
+                    </div>
+                    <div class="card-body">
+                        {% if current_change %}
+                        <div class="alert alert-info small p-2 mb-2">
+                            <i class="bi bi-info-circle me-1"></i>To create a new change, first clear the current one using the "Clear Change" button.
+                        </div>
+                        {% endif %}
+                        <input type="text" class="form-control mb-2" id="manual-change-number" placeholder="Change Number" {% if current_change %}disabled{% endif %}>
+                        <textarea class="form-control mb-2" id="manual-change-description" rows="2" placeholder="Description (Optional)" {% if current_change %}disabled{% endif %}></textarea>
+                        <hr class="my-2">
+                        <h6 class="small text-muted">Add Instance</h6>
+                        <div class="row g-1 mb-2">
+                            <div class="col-6">
+                                <input type="text" class="form-control form-control-sm" id="manual-instance-id" placeholder="Instance ID" {% if current_change %}disabled{% endif %}>
+                            </div>
+                            <div class="col-6">
+                                <input type="text" class="form-control form-control-sm" id="manual-account-id" placeholder="Account ID" {% if current_change %}disabled{% endif %}>
+                            </div>
+                        </div>
+                        <div class="row g-1 mb-2">
+                            <div class="col-6">
+                                <select class="form-select form-select-sm" id="manual-region" {% if current_change %}disabled{% endif %}>
+                                    <option value="">Region</option>
+                                    <option value="us-east-1">us-east-1</option>
+                                    <option value="us-east-2">us-east-2</option>
+                                    <option value="us-west-1">us-west-1</option>
+                                    <option value="us-west-2">us-west-2</option>
+                                    <option value="us-gov-west-1">us-gov-west-1</option>
+                                    <option value="us-gov-east-1">us-gov-east-1</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <select class="form-select form-select-sm" id="manual-platform" {% if current_change %}disabled{% endif %}>
+                                    <option value="">Platform</option>
+                                    <option value="linux">Linux</option>
+                                    <option value="windows">Windows</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button class="btn btn-warning btn-sm w-100 mb-1" onclick="addManualInstance()" {% if current_change %}disabled{% endif %}>
+                            <i class="bi bi-plus-circle me-1"></i>Add Instance
+                        </button>
+                        <button class="btn btn-success btn-sm w-100" id="save-manual-change-btn" onclick="saveManualChange()" disabled>
+                            <i class="bi bi-save me-1"></i>Save Change
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Current Change Display -->
+        <div class="row mt-3">
+            <div class="col-12">
+                {% if current_change %}
+                <div class="alert alert-info mb-0">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>Active Change:</strong> {{ current_change.change_number }}
+                            <br>
+                            <small>
+                                <strong>Total Instances:</strong> {{ current_change.instances|length }} |
+                                <strong>Linux:</strong> {{ current_change.instances|selectattr("platform", "equalto", "linux")|list|length }} |
+                                <strong>Windows:</strong> {{ current_change.instances|selectattr("platform", "equalto", "windows")|list|length }}
+                            </small>
+                        </div>
+                        <button class="btn btn-danger" onclick="clearChange()">
+                            <i class="bi bi-x-circle me-1"></i>Clear Change
+                        </button>
+                    </div>
+                    
+                    <!-- Instance List Preview -->
+                    <div class="mt-2">
+                        <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#instance-list-{{ tool_name }}" aria-expanded="false">
+                            <i class="bi bi-list"></i> Show/Hide Instances
+                        </button>
+                        <div class="collapse mt-2" id="instance-list-{{ tool_name }}">
+                            <div class="list-group" style="max-height: 200px; overflow-y: auto;">
+                                {% if current_change and current_change.instances %}
+                                {% for instance in current_change.instances[:10] %}
+                                <div class="list-group-item py-1">
+                                    <small>
+                                        <strong>{{ instance.instance_id }}</strong> - 
+                                        {{ instance.account_id }} | {{ instance.region }} | {{ instance.platform }}
+                                    </small>
+                                </div>
+                                {% endfor %}
+                                {% if current_change.instances|length > 10 %}
+                                <div class="list-group-item py-1 text-muted">
+                                    <small>... and {{ current_change.instances|length - 10 }} more instances</small>
+                                </div>
+                                {% endif %}
+                                {% else %}
+                                <div class="list-group-item py-1 text-muted">
+                                    <small>No instances to display</small>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="alert alert-warning mb-0">
+                    <i class="bi bi-info-circle me-1"></i>No change loaded. Select from list, upload CSV, or add manually.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Manual Instances Preview (hidden by default) -->
+<div id="manual-instances-preview" style="display: none; width: 300px; z-index: 1050;" class="position-fixed bottom-0 end-0 m-3 card">
+    <div class="card-header bg-warning text-dark">
+        <h6 class="mb-0">Instances to Add</h6>
+    </div>
+    <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+        <div id="manual-instances-list" class="list-group">
+            <!-- Instances will be added here -->
+        </div>
+    </div>
+</div>
+
+<!-- Include external change management script -->
+<script src="{{ url_for('static', path='/js/change-management.js') }}"></script>
+<script>
+// Initialize change management with the tool-specific endpoint
+// The tool_endpoint variable should be provided by the server template context
+const toolEndpoint = {{ tool_endpoint|default("/aws/script-runner")|tojson }};
+initChangeManagement(toolEndpoint);
+</script>
