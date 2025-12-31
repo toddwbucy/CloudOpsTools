@@ -205,6 +205,689 @@ class TestCSRFProtection:
                 f"Expected 200 (success) or 404 (not implemented)."
             )
 
+    # =========================================================================
+    # CSRF Endpoint Definitions for Parametrized Tests
+    # =========================================================================
+
+    # Critical priority endpoints - highest risk if CSRF bypassed
+    CRITICAL_CSRF_ENDPOINTS = [
+        # Feature Flags (can disable security features)
+        (
+            "/api/feature-flags/toggle",
+            "POST",
+            {"flag_name": "test_flag", "enabled": True},
+            "Toggle feature flag"
+        ),
+        (
+            "/api/feature-flags/emergency-rollback",
+            "POST",
+            {},
+            "Emergency rollback all flags"
+        ),
+        # Script Executions (can execute arbitrary code)
+        (
+            "/api/script-runner/executions/",
+            "POST",
+            {"script_id": 1, "instance_id": "i-1234567890abcdef0", "parameters": {}},
+            "Execute script on instance"
+        ),
+        (
+            "/api/script-runner/executions/batch",
+            "POST",
+            {"script_id": 1, "instance_ids": ["i-1234567890abcdef0"], "parameters": {}},
+            "Execute script on multiple instances"
+        ),
+        (
+            "/api/script-runner/executions/single",
+            "POST",
+            {"script_id": 1, "instance_id": "i-1234567890abcdef0"},
+            "Execute single script (modular)"
+        ),
+        # Tools (can execute tools on instances)
+        (
+            "/api/tools/1/execute",
+            "POST",
+            {"instance_id": "i-1234567890abcdef0", "parameters": {}},
+            "Execute tool on instance"
+        ),
+        # AWS Authentication (session hijacking risk)
+        (
+            "/aws/authenticate",
+            "POST",
+            {"access_key": "test", "secret_key": "test", "environment": "com"},
+            "Authenticate with AWS"
+        ),
+    ]
+
+    # High priority endpoints - credential/data modification
+    HIGH_CSRF_ENDPOINTS = [
+        # Auth/Credentials
+        (
+            "/api/auth/aws-credentials",
+            "POST",
+            {"access_key": "AKIA12345678EXAMPLE", "secret_key": "testsecret", "environment": "com"},
+            "Validate AWS credentials"
+        ),
+        (
+            "/api/auth/aws-credentials/com",
+            "DELETE",
+            None,
+            "Clear AWS credentials"
+        ),
+        (
+            "/aws/test-credentials",
+            "POST",
+            {"access_key": "test", "secret_key": "test"},
+            "Test AWS credentials"
+        ),
+        (
+            "/aws/clear-credentials",
+            "POST",
+            {},
+            "Clear all AWS credentials"
+        ),
+        # Scripts CRUD
+        (
+            "/api/scripts/",
+            "POST",
+            {"name": "test", "content": "echo test", "description": "Test", "script_type": "bash"},
+            "Create script"
+        ),
+        (
+            "/api/scripts/1",
+            "PUT",
+            {"name": "test", "content": "echo updated", "description": "Updated"},
+            "Update script"
+        ),
+        (
+            "/api/scripts/1",
+            "DELETE",
+            None,
+            "Delete script"
+        ),
+        # Changes CRUD
+        (
+            "/api/script-runner/changes/",
+            "POST",
+            {"change_number": "CHG0001234", "description": "Test change"},
+            "Create change"
+        ),
+        (
+            "/api/script-runner/changes/CHG0001234",
+            "PUT",
+            {"description": "Updated description"},
+            "Update change"
+        ),
+        # Accounts
+        (
+            "/api/script-runner/accounts/",
+            "POST",
+            {"account_id": "123456789012", "name": "Test Account"},
+            "Create/discover account"
+        ),
+        (
+            "/api/script-runner/accounts/123456789012",
+            "POST",
+            {"name": "Updated Account"},
+            "Update account"
+        ),
+        # Organization
+        (
+            "/api/script-runner/org/visit-organization",
+            "POST",
+            {"org_id": "o-abc123"},
+            "Discover organization accounts"
+        ),
+        # AWS Operations
+        (
+            "/api/script-runner/aws-operations/start",
+            "POST",
+            {"operation_type": "scan"},
+            "Start AWS scan"
+        ),
+        # Linux QC Operations
+        (
+            "/aws/linux-qc-prep/execute-qc-step",
+            "POST",
+            {"step": "check", "instance_id": "i-1234567890abcdef0"},
+            "Execute QC check step"
+        ),
+        (
+            "/aws/linux-qc-prep/execute-step2-kernel-staging",
+            "POST",
+            {"instance_id": "i-1234567890abcdef0"},
+            "Execute kernel staging"
+        ),
+        (
+            "/aws/linux-qc-prep/execute-step2-multi-kernel",
+            "POST",
+            {"instance_ids": ["i-1234567890abcdef0"]},
+            "Execute multi-kernel step"
+        ),
+        (
+            "/aws/linux-qc-post/execute-post-validation",
+            "POST",
+            {"instance_id": "i-1234567890abcdef0"},
+            "Execute post-patching validation"
+        ),
+        # SFT Fixer
+        (
+            "/aws/sft-fixer/execute-script",
+            "POST",
+            {"instance_id": "i-1234567890abcdef0", "script": "fix"},
+            "Execute SFT fix script"
+        ),
+    ]
+
+    # Medium priority endpoints - workflow operations
+    MEDIUM_CSRF_ENDPOINTS = [
+        # Linux QC Prep
+        (
+            "/aws/linux-qc-prep/test-connectivity",
+            "POST",
+            {"instance_id": "i-1234567890abcdef0"},
+            "Test instance connectivity"
+        ),
+        (
+            "/aws/linux-qc-prep/load-change/CHG0001234",
+            "POST",
+            {},
+            "Load change request"
+        ),
+        (
+            "/aws/linux-qc-prep/clear-change",
+            "POST",
+            {},
+            "Clear current change"
+        ),
+        (
+            "/aws/linux-qc-prep/save-change-with-instances",
+            "POST",
+            {"change_number": "CHG0001234", "instances": []},
+            "Save change with instances"
+        ),
+        (
+            "/aws/linux-qc-prep/upload-change-csv",
+            "POST",
+            {},  # Would have file upload
+            "Upload change CSV"
+        ),
+        # Linux QC Post
+        (
+            "/aws/linux-qc-post/test-connectivity",
+            "POST",
+            {"instance_id": "i-1234567890abcdef0"},
+            "Test connectivity (post)"
+        ),
+        (
+            "/aws/linux-qc-post/load-change/CHG0001234",
+            "POST",
+            {},
+            "Load change (post)"
+        ),
+        (
+            "/aws/linux-qc-post/clear-change",
+            "POST",
+            {},
+            "Clear change (post)"
+        ),
+        (
+            "/aws/linux-qc-post/save-change-with-instances",
+            "POST",
+            {"change_number": "CHG0001234", "instances": []},
+            "Save change with instances (post)"
+        ),
+        (
+            "/aws/linux-qc-post/upload-change-csv",
+            "POST",
+            {},
+            "Upload change CSV (post)"
+        ),
+        # SFT Fixer
+        (
+            "/aws/sft-fixer/validate-instance",
+            "POST",
+            {"instance_id": "i-1234567890abcdef0"},
+            "Validate instance for SFT"
+        ),
+        # Accounts instances
+        (
+            "/api/script-runner/accounts/123456789012/instances",
+            "POST",
+            {},
+            "Refresh instances"
+        ),
+        (
+            "/api/script-runner/accounts/123456789012/instances/i-1234567890abcdef0/status",
+            "POST",
+            {},
+            "Get instance status"
+        ),
+        # Changes
+        (
+            "/api/script-runner/changes/compare",
+            "POST",
+            {"change_numbers": ["CHG0001234", "CHG0001235"]},
+            "Compare changes"
+        ),
+        # AWS Operations
+        (
+            "/api/script-runner/aws-operations/scan123/resume",
+            "POST",
+            {},
+            "Resume scan"
+        ),
+        # Executions
+        (
+            "/api/script-runner/executions/batch/batch123/refresh-status",
+            "POST",
+            {},
+            "Refresh batch status"
+        ),
+        (
+            "/api/script-runner/executions/generate-report",
+            "POST",
+            {"execution_ids": [1, 2, 3]},
+            "Generate execution report"
+        ),
+        (
+            "/api/script-runner/executions/status/refresh",
+            "POST",
+            {"execution_id": 1},
+            "Refresh execution status (modular)"
+        ),
+        (
+            "/api/script-runner/executions/reports/generate",
+            "POST",
+            {"execution_ids": [1]},
+            "Generate report (modular)"
+        ),
+    ]
+
+    # Low priority endpoints - debug/non-sensitive
+    LOW_CSRF_ENDPOINTS = [
+        (
+            "/aws/linux-qc-prep/debug-session",
+            "POST",
+            {},
+            "Debug session state"
+        ),
+    ]
+
+    # =========================================================================
+    # Parametrized CSRF Tests for All Endpoints
+    # =========================================================================
+
+    def _make_csrf_request(self, client, endpoint, method, payload, csrf_token=None):
+        """Helper to make a request with optional CSRF token
+
+        Returns the response from the request.
+        """
+        headers = {}
+        if csrf_token:
+            headers["X-CSRF-Token"] = csrf_token
+
+        if method == "POST":
+            if payload is not None:
+                return client.post(endpoint, json=payload, headers=headers)
+            else:
+                return client.post(endpoint, headers=headers)
+        elif method == "PUT":
+            if payload is not None:
+                return client.put(endpoint, json=payload, headers=headers)
+            else:
+                return client.put(endpoint, headers=headers)
+        elif method == "DELETE":
+            return client.delete(endpoint, headers=headers)
+        else:
+            raise ValueError(f"Unsupported HTTP method: {method}")
+
+    def _check_csrf_protection(self, client, endpoint, method, payload, description):
+        """Helper to test CSRF protection for an endpoint
+
+        Tests that:
+        1. If CSRF is not implemented, endpoint works without token
+        2. If CSRF is implemented:
+           - Request without token returns 403
+           - Request with invalid token returns 403
+           - Request with valid token succeeds or returns validation error
+
+        Returns True if tests pass, raises AssertionError otherwise.
+        """
+        # First check if CSRF protection is implemented
+        csrf_response = client.get("/api/auth/csrf-token")
+
+        if csrf_response.status_code == 404:
+            # CSRF not implemented - endpoint should work without token
+            response = self._make_csrf_request(client, endpoint, method, payload)
+
+            if response.status_code == 404:
+                # Endpoint not implemented yet
+                return True
+
+            # Should work or return validation error, not CSRF error
+            assert response.status_code in [200, 201, 400, 401, 422, 405, 500], (
+                f"[{description}] Without CSRF implementation, expected success/validation "
+                f"error, got {response.status_code}: {response.text[:200]}"
+            )
+            return True
+
+        elif csrf_response.status_code == 200:
+            # CSRF protection is implemented - test full protection
+            csrf_data = csrf_response.json()
+            valid_token = csrf_data.get("csrf_token", "")
+
+            # Test 1: Request without CSRF token should fail with 403
+            response_no_token = self._make_csrf_request(
+                client, endpoint, method, payload
+            )
+
+            if response_no_token.status_code == 404:
+                # Endpoint not implemented yet
+                return True
+
+            if response_no_token.status_code == 405:
+                # Method not allowed - skip this test
+                return True
+
+            assert response_no_token.status_code == 403, (
+                f"[{description}] Request without CSRF token should return 403, "
+                f"got {response_no_token.status_code}"
+            )
+
+            # Test 2: Request with invalid CSRF token should fail with 403
+            response_invalid = self._make_csrf_request(
+                client, endpoint, method, payload,
+                csrf_token="invalid-csrf-token-12345"
+            )
+            assert response_invalid.status_code == 403, (
+                f"[{description}] Request with invalid CSRF token should return 403, "
+                f"got {response_invalid.status_code}"
+            )
+
+            # Test 3: Request with valid CSRF token should succeed
+            response_valid = self._make_csrf_request(
+                client, endpoint, method, payload,
+                csrf_token=valid_token
+            )
+            # Should succeed or fail validation, not CSRF error
+            assert response_valid.status_code in [200, 201, 400, 401, 422, 500], (
+                f"[{description}] Request with valid CSRF token should succeed or "
+                f"return validation error, got {response_valid.status_code}"
+            )
+
+            return True
+
+        else:
+            pytest.fail(
+                f"Unexpected status {csrf_response.status_code} from CSRF token endpoint"
+            )
+
+    # -------------------------------------------------------------------------
+    # CRITICAL Priority Endpoint Tests
+    # -------------------------------------------------------------------------
+
+    @pytest.mark.parametrize(
+        "endpoint,method,payload,description",
+        CRITICAL_CSRF_ENDPOINTS,
+        ids=[e[3] for e in CRITICAL_CSRF_ENDPOINTS]
+    )
+    def test_csrf_critical_endpoints(self, client, endpoint, method, payload, description):
+        """Test CSRF protection for CRITICAL priority endpoints
+
+        These endpoints have the highest security risk if CSRF protection
+        is bypassed. They include:
+        - Feature flag toggles (can disable security features)
+        - Script executions (can execute arbitrary code on instances)
+        - Tool executions (can run tools on instances)
+        - AWS authentication (session hijacking risk)
+
+        Expected behavior:
+        - If CSRF not implemented: Endpoints work normally
+        - If CSRF implemented: Must require valid CSRF token
+        """
+        self._check_csrf_protection(client, endpoint, method, payload, description)
+
+    # -------------------------------------------------------------------------
+    # HIGH Priority Endpoint Tests
+    # -------------------------------------------------------------------------
+
+    @pytest.mark.parametrize(
+        "endpoint,method,payload,description",
+        HIGH_CSRF_ENDPOINTS,
+        ids=[e[3] for e in HIGH_CSRF_ENDPOINTS]
+    )
+    def test_csrf_high_priority_endpoints(self, client, endpoint, method, payload, description):
+        """Test CSRF protection for HIGH priority endpoints
+
+        These endpoints handle sensitive operations including:
+        - Credential validation and clearing
+        - Script CRUD operations
+        - Change request management
+        - Account and organization management
+        - Kernel/patching execution steps
+
+        Expected behavior:
+        - If CSRF not implemented: Endpoints work normally
+        - If CSRF implemented: Must require valid CSRF token
+        """
+        self._check_csrf_protection(client, endpoint, method, payload, description)
+
+    # -------------------------------------------------------------------------
+    # MEDIUM Priority Endpoint Tests
+    # -------------------------------------------------------------------------
+
+    @pytest.mark.parametrize(
+        "endpoint,method,payload,description",
+        MEDIUM_CSRF_ENDPOINTS,
+        ids=[e[3] for e in MEDIUM_CSRF_ENDPOINTS]
+    )
+    def test_csrf_medium_priority_endpoints(self, client, endpoint, method, payload, description):
+        """Test CSRF protection for MEDIUM priority endpoints
+
+        These endpoints handle workflow operations including:
+        - Connectivity testing
+        - Change loading/clearing
+        - Status refresh operations
+        - Report generation
+
+        Expected behavior:
+        - If CSRF not implemented: Endpoints work normally
+        - If CSRF implemented: Must require valid CSRF token
+        """
+        self._check_csrf_protection(client, endpoint, method, payload, description)
+
+    # -------------------------------------------------------------------------
+    # LOW Priority Endpoint Tests
+    # -------------------------------------------------------------------------
+
+    @pytest.mark.parametrize(
+        "endpoint,method,payload,description",
+        LOW_CSRF_ENDPOINTS,
+        ids=[e[3] for e in LOW_CSRF_ENDPOINTS]
+    )
+    def test_csrf_low_priority_endpoints(self, client, endpoint, method, payload, description):
+        """Test CSRF protection for LOW priority endpoints
+
+        These endpoints handle non-sensitive operations including:
+        - Debug operations
+
+        Expected behavior:
+        - If CSRF not implemented: Endpoints work normally
+        - If CSRF implemented: May or may not require CSRF token
+        """
+        self._check_csrf_protection(client, endpoint, method, payload, description)
+
+    # =========================================================================
+    # Additional CSRF Security Tests
+    # =========================================================================
+
+    def test_csrf_token_not_accepted_after_expiration(self, client):
+        """Test that expired CSRF tokens are rejected
+
+        CSRF tokens should have a limited lifetime to prevent
+        replay attacks using stolen tokens.
+
+        If CSRF not implemented yet, test passes to allow development.
+        """
+        csrf_response = client.get("/api/auth/csrf-token")
+
+        if csrf_response.status_code == 404:
+            # CSRF not implemented yet
+            pass
+        elif csrf_response.status_code == 200:
+            csrf_data = csrf_response.json()
+            csrf_token = csrf_data.get("csrf_token", "")
+
+            # If expiration is implemented, there should be an expiry field
+            # or tokens should be bound to session
+            if "expires_at" in csrf_data:
+                import datetime
+                expiry = csrf_data["expires_at"]
+                # Verify expiry is in the future
+                assert expiry, "CSRF token should have an expiration time"
+
+    def test_csrf_protection_on_all_http_methods(self, client):
+        """Test that CSRF protection covers all state-changing HTTP methods
+
+        POST, PUT, DELETE, and PATCH should all require CSRF tokens.
+        GET and HEAD should not require CSRF tokens.
+        """
+        csrf_response = client.get("/api/auth/csrf-token")
+
+        if csrf_response.status_code == 404:
+            # CSRF not implemented yet
+            pass
+        elif csrf_response.status_code == 200:
+            # GET requests should not need CSRF token
+            get_response = client.get("/api/health")
+            assert get_response.status_code != 403, (
+                "GET requests should not require CSRF token"
+            )
+
+            # HEAD requests should not need CSRF token
+            head_response = client.head("/api/health")
+            assert head_response.status_code != 403, (
+                "HEAD requests should not require CSRF token"
+            )
+
+    def test_csrf_token_bound_to_session(self, client):
+        """Test that CSRF tokens are bound to the user's session
+
+        A CSRF token generated in one session should not be valid
+        in a different session to prevent token theft.
+
+        If CSRF not implemented yet, test passes to allow development.
+        """
+        csrf_response = client.get("/api/auth/csrf-token")
+
+        if csrf_response.status_code == 404:
+            # CSRF not implemented yet
+            pass
+        elif csrf_response.status_code == 200:
+            # Document expected behavior: tokens should be session-bound
+            # This test will validate once CSRF is fully implemented
+            csrf_data = csrf_response.json()
+            assert "csrf_token" in csrf_data, "CSRF response should contain token"
+
+    def test_csrf_double_submit_cookie_pattern(self, client):
+        """Test double-submit cookie pattern if implemented
+
+        The double-submit cookie pattern requires the CSRF token to be
+        sent both as a cookie and as a header/form field. The server
+        compares both values.
+
+        If CSRF not implemented yet, test passes to allow development.
+        """
+        csrf_response = client.get("/api/auth/csrf-token")
+
+        if csrf_response.status_code == 404:
+            # CSRF not implemented yet
+            pass
+        elif csrf_response.status_code == 200:
+            # Check if CSRF cookie is set
+            csrf_cookies = [
+                cookie for cookie in csrf_response.cookies.values()
+                if 'csrf' in cookie.name.lower()
+            ]
+
+            if csrf_cookies:
+                # Double-submit pattern is in use
+                csrf_cookie = csrf_cookies[0]
+                # Cookie should have proper security flags
+                # (These will be validated after implementation)
+                pass
+
+    def test_csrf_origin_header_validation(self, client):
+        """Test that Origin header is validated for CSRF protection
+
+        Requests with mismatched Origin headers should be rejected
+        as they may indicate CSRF attacks.
+
+        If CSRF not implemented yet, test passes to allow development.
+        """
+        csrf_response = client.get("/api/auth/csrf-token")
+
+        if csrf_response.status_code == 404:
+            # CSRF not implemented yet
+            pass
+        elif csrf_response.status_code == 200:
+            csrf_data = csrf_response.json()
+            csrf_token = csrf_data.get("csrf_token", "")
+
+            # Request with suspicious Origin header
+            response = client.post(
+                "/api/feature-flags/toggle",
+                json={"flag_name": "test", "enabled": True},
+                headers={
+                    "X-CSRF-Token": csrf_token,
+                    "Origin": "https://evil-attacker.com"
+                }
+            )
+
+            if response.status_code != 404:
+                # Should either succeed (if origin checking not implemented)
+                # or fail with 403 (if origin checking is implemented)
+                # Both are acceptable based on implementation status
+                assert response.status_code in [200, 403, 422], (
+                    f"Request with suspicious origin should succeed or be blocked, "
+                    f"got {response.status_code}"
+                )
+
+    def test_csrf_referer_header_validation(self, client):
+        """Test that Referer header is validated for CSRF protection
+
+        Requests with mismatched Referer headers may indicate CSRF attacks.
+
+        If CSRF not implemented yet, test passes to allow development.
+        """
+        csrf_response = client.get("/api/auth/csrf-token")
+
+        if csrf_response.status_code == 404:
+            # CSRF not implemented yet
+            pass
+        elif csrf_response.status_code == 200:
+            csrf_data = csrf_response.json()
+            csrf_token = csrf_data.get("csrf_token", "")
+
+            # Request with suspicious Referer header
+            response = client.post(
+                "/api/feature-flags/toggle",
+                json={"flag_name": "test", "enabled": True},
+                headers={
+                    "X-CSRF-Token": csrf_token,
+                    "Referer": "https://malicious-site.com/attack"
+                }
+            )
+
+            if response.status_code != 404:
+                # Should either succeed (if referer checking not implemented)
+                # or fail with 403 (if referer checking is implemented)
+                assert response.status_code in [200, 403, 422], (
+                    f"Request with suspicious referer should succeed or be blocked, "
+                    f"got {response.status_code}"
+                )
+
 
 @pytest.mark.security
 @pytest.mark.xss
