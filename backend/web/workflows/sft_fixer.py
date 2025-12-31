@@ -26,7 +26,7 @@ from pydantic import BaseModel, Field
 
 from backend.core.config import settings
 from backend.providers.base import ProviderBase
-from backend.web.utils import get_authenticated_provider
+from backend.web.utils import get_authenticated_provider, safe_substitute_parameters
 
 router = APIRouter()
 
@@ -546,11 +546,8 @@ def get_fix_script(fix_name: str, parameters: Optional[Dict[str, Any]] = None) -
     fix_config = FIX_SCRIPTS[fix_name]
     script_content = fix_config["script"]
 
-    # Apply any parameter substitutions if provided
-    if parameters:
-        for key, value in parameters.items():
-            placeholder = f"${{{key}}}"
-            script_content = script_content.replace(placeholder, str(value))
+    # Apply any parameter substitutions if provided (with shell escaping for security)
+    script_content = safe_substitute_parameters(script_content, parameters)
 
     return {
         "script": script_content,

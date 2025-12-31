@@ -169,7 +169,15 @@ async def authenticate(
         ) from e
     except NotImplementedError as e:
         # Provider validation not yet implemented
-        # For development, allow authentication to proceed with session storage
+        # Only allow bypass in development mode for testing
+        if not settings.DEV_MODE:
+            raise HTTPException(
+                status_code=501,
+                detail=f"Provider validation not implemented for {provider_name}. "
+                       "Set DEV_MODE=true to bypass validation in development.",
+            ) from e
+
+        # Development mode: allow authentication to proceed with session storage
         if hasattr(request, "session"):
             request.session["provider"] = provider_name
             request.session["credentials"] = credentials
@@ -181,7 +189,7 @@ async def authenticate(
             success=True,
             provider=provider_name,
             environment=environment,
-            message=f"Authenticated with {provider_name} (validation pending implementation)",
+            message=f"Authenticated with {provider_name} (DEV MODE: validation pending implementation)",
         )
     except Exception as e:
         raise HTTPException(

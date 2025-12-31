@@ -1,6 +1,7 @@
 """Authentication utilities for web workflows."""
 
-from typing import Dict, Any
+import shlex
+from typing import Dict, Any, Optional
 from fastapi import HTTPException, Request
 
 from backend.core.config import settings
@@ -46,3 +47,35 @@ def get_authenticated_provider(request: Request) -> ProviderBase:
             status_code=400,
             detail=str(e),
         ) from None
+
+
+def safe_substitute_parameters(
+    script_content: str, parameters: Optional[Dict[str, Any]] = None
+) -> str:
+    """Safely substitute parameters in script content with shell escaping.
+
+    This function prevents shell injection attacks by using shlex.quote()
+    to escape all parameter values before substitution.
+
+    Args:
+        script_content: Script template with ${key} placeholders.
+        parameters: Dictionary of key-value pairs to substitute.
+
+    Returns:
+        Script content with safely substituted parameters.
+
+    Example:
+        >>> script = "echo ${message}"
+        >>> safe_substitute_parameters(script, {"message": "hello; rm -rf /"})
+        "echo 'hello; rm -rf /'"
+    """
+    if not parameters:
+        return script_content
+
+    for key, value in parameters.items():
+        placeholder = f"${{{key}}}"
+        # Escape shell metacharacters to prevent injection
+        safe_value = shlex.quote(str(value))
+        script_content = script_content.replace(placeholder, safe_value)
+
+    return script_content
