@@ -76,16 +76,17 @@ async def execute_tool(
         CredentialManager,
     )
 
-    # Define placeholder classes for type checking
+    # Placeholder classes for type checking only
     class EC2Service:
+        # Placeholder for type checking - actual implementation required
         def __init__(self, session: Any, region: str) -> None:
             self.session = session
             self.region = region
 
         def get_instance(self, instance_id: str) -> Dict[str, Any]:
-            # Placeholder implementation
-            return {"platform": "linux"}
+            raise NotImplementedError("EC2Service is a placeholder - actual implementation required")
 
+    # Placeholder for type checking - actual implementation required
     class ScriptRunner:
         def __init__(self, session: Any, region: str) -> None:
             self.session = session
@@ -94,14 +95,7 @@ async def execute_tool(
         def run_command(
             self, instance_id: str, command: str, **kwargs: Any
         ) -> Dict[str, Any]:
-            # Placeholder implementation
-            return {
-                "status": "success",
-                "exit_code": 0,
-                "stdout": "Command executed successfully",
-                "stderr": "",
-                "execution_time": 1.5,
-            }
+            raise NotImplementedError("ScriptRunner is a placeholder - actual implementation required")
 
     logger = logging.getLogger(__name__)
 
