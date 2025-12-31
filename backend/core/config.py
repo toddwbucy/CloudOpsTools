@@ -1,51 +1,40 @@
-from enum import Enum
-from pathlib import Path
-from typing import List, Optional
-import logging
+"""Application configuration with multi-provider support.
 
-from pydantic import Field, field_validator
+This module provides centralized configuration management using Pydantic v2
+settings. It supports multiple cloud providers with environment-specific
+credentials while maintaining backward compatibility with existing AWS
+environment variables.
+
+Example usage:
+    from backend.core.config import settings
+
+    # Get default provider
+    provider_name = settings.DEFAULT_PROVIDER
+
+    # Get credentials for a specific provider and environment
+    aws_creds = settings.get_provider_credentials("aws", "com")
+"""
+
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class AWSEnvironment(str, Enum):
-    """AWS Environment types"""
-
-    COM = "com"
-    GOV = "gov"
-
-
-class AWSCredentials(BaseSettings):
-    """Settings model for AWS credentials"""
-
-    access_key: str
-    secret_key: str
-    session_token: Optional[str] = None  # Optional for non-STS credentials
-    expiration: Optional[int] = None
-    environment: AWSEnvironment
-    assumed_role: Optional[str] = None  # ARN of assumed role if using STS
-    access_time: Optional[float] = None  # Track when credentials were stored
-
-    @field_validator("environment", mode="before")
-    @classmethod
-    def validate_environment(cls, v):
-        """Convert string environment to enum if needed"""
-        if isinstance(v, str):
-            return AWSEnvironment(v)
-        return v
-
-    @field_validator("expiration", mode="before")
-    @classmethod
-    def validate_expiration(cls, v):
-        """Convert float expiration to int if needed"""
-        if isinstance(v, float):
-            return int(v)
-        return v
-
-    model_config = SettingsConfigDict(extra="allow")
-
-
 class Settings(BaseSettings):
-    """Application settings"""
+    """Application settings with multi-provider credential support.
+
+    Environment variables are loaded from .env file if present.
+    AWS credentials maintain backward compatibility with existing
+    _COM and _GOV suffixes for Commercial and GovCloud environments.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",  # Ignore extra env vars not defined in the model
+    )
 
     # Application settings
     APP_NAME: str = "CloudOpsTools"
@@ -80,14 +69,14 @@ class Settings(BaseSettings):
     # AWS settings
     AWS_DEFAULT_REGION: str = "us-east-1"
 
-    # AWS Credentials for COM environment
+    # AWS Commercial environment credentials (backward compatible)
     AWS_ACCESS_KEY_ID_COM: Optional[str] = None
     AWS_SECRET_ACCESS_KEY_COM: Optional[str] = None
-    AWS_SESSION_TOKEN_COM: Optional[str] = None
 
-    # AWS Credentials for GOV environment
+    # AWS GovCloud environment credentials (backward compatible)
     AWS_ACCESS_KEY_ID_GOV: Optional[str] = None
     AWS_SECRET_ACCESS_KEY_GOV: Optional[str] = None
+    AWS_SESSION_TOKEN_COM: Optional[str] = None
     AWS_SESSION_TOKEN_GOV: Optional[str] = None
 
     # Session settings
@@ -100,100 +89,83 @@ class Settings(BaseSettings):
     MAX_CONCURRENT_EXECUTIONS: int = 5
     EXECUTION_TIMEOUT: int = 1800  # 30 minutes
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=True,
-    )
+    # Default provider when not specified in session
+    DEFAULT_PROVIDER: str = "aws"
 
-    @field_validator("CORS_ORIGINS", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v):
-        """Parse CORS_ORIGINS from JSON string if provided as env var"""
-        if isinstance(v, str):
-            import json
-            try:
-                # Try to parse as JSON array
-                parsed = json.loads(v)
-                if isinstance(parsed, list):
-                    return parsed
-                else:
-                    raise ValueError("CORS_ORIGINS must be a JSON array")
-            except json.JSONDecodeError:
-                # If not valid JSON, treat as comma-separated list
-                return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+    def get_provider_credentials(
+        self, provider: str, environment: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Get credentials for a specific provider and environment.
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        # Ensure upload folder exists
-        self.UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
-        # Ensure data directory exists
-        Path("./data").mkdir(parents=True, exist_ok=True)
+        Args:
+            provider: Provider identifier (e.g., "aws", "azure", "gcp").
+            environment: Provider-specific environment (e.g., "com", "gov" for AWS).
+                If None, returns all environments for the provider.
 
-        # Apply Phase 1 security fixes if feature flag is enabled
-        self._apply_phase1_security_fixes()
+        Returns:
+            Dictionary with credentials for the specified provider/environment.
+            For AWS with environment specified:
+                {"access_key_id": "...", "secret_access_key": "...", "session_token": "..."}
+            For AWS without environment (all environments):
+                {
+                    "com": {"access_key_id": "...", "secret_access_key": "...", "session_token": "..."},
+                    "gov": {"access_key_id": "...", "secret_access_key": "...", "session_token": "..."}
+                }
 
-    def get_credentials(self, environment: AWSEnvironment) -> Optional[AWSCredentials]:
-        """Get credentials for a specific environment"""
-        if environment == AWSEnvironment.COM:
-            if not self.AWS_ACCESS_KEY_ID_COM or not self.AWS_SECRET_ACCESS_KEY_COM:
-                return None
+        Raises:
+            ValueError: If provider is not supported or environment is invalid.
+        """
+        provider_creds = self._get_all_provider_credentials()
 
-            return AWSCredentials(
-                access_key=self.AWS_ACCESS_KEY_ID_COM,
-                secret_key=self.AWS_SECRET_ACCESS_KEY_COM,
-                session_token=self.AWS_SESSION_TOKEN_COM,
-                environment=AWSEnvironment.COM,
+        if provider not in provider_creds:
+            available = list(provider_creds.keys())
+            raise ValueError(
+                f"Unknown provider: '{provider}'. "
+                f"Available providers: {available or 'none configured'}"
             )
 
-        elif environment == AWSEnvironment.GOV:
-            if not self.AWS_ACCESS_KEY_ID_GOV or not self.AWS_SECRET_ACCESS_KEY_GOV:
-                return None
+        if environment is None:
+            return provider_creds[provider]
 
-            return AWSCredentials(
-                access_key=self.AWS_ACCESS_KEY_ID_GOV,
-                secret_key=self.AWS_SECRET_ACCESS_KEY_GOV,
-                session_token=self.AWS_SESSION_TOKEN_GOV,
-                environment=AWSEnvironment.GOV,
+        env_creds = provider_creds[provider]
+        if environment not in env_creds:
+            available = list(env_creds.keys())
+            raise ValueError(
+                f"Unknown environment '{environment}' for provider '{provider}'. "
+                f"Available environments: {available or 'none configured'}"
             )
 
-        return None
+        return env_creds[environment]
 
-    def get_available_environments(self) -> List[AWSEnvironment]:
-        """Get list of environments with available credentials"""
-        environments = []
+    def _get_all_provider_credentials(self) -> Dict[str, Dict[str, Dict[str, Any]]]:
+        """Return credentials organized by provider and environment.
 
-        if self.AWS_ACCESS_KEY_ID_COM and self.AWS_SECRET_ACCESS_KEY_COM:
-            environments.append(AWSEnvironment.COM)
-
-        if self.AWS_ACCESS_KEY_ID_GOV and self.AWS_SECRET_ACCESS_KEY_GOV:
-            environments.append(AWSEnvironment.GOV)
-
-        return environments
-
-    def _apply_phase1_security_fixes(self):
-        """Apply Phase 1 security fixes when feature flags are enabled"""
-        try:
-            # Import here to avoid circular imports
-            from backend.core.feature_flags import is_feature_enabled
-
-            # Fix 1: Secure SECRET_KEY handling
-            if is_feature_enabled('NEW_SECRET_KEY_HANDLING'):
-                from backend.core.security import get_or_create_secret_key
-                try:
-                    secure_key = get_or_create_secret_key()
-                    self.SECRET_KEY = secure_key
-                    logging.getLogger(__name__).info("Applied secure SECRET_KEY handling")
-                except Exception as e:
-                    logging.getLogger(__name__).error(f"Failed to apply secure SECRET_KEY: {e}")
-                    # Keep the existing key but warn
-                    logging.getLogger(__name__).warning("Continuing with existing SECRET_KEY (security risk)")
-
-        except ImportError:
-            # Feature flags not available during early initialization
-            pass
+        Returns:
+            Nested dictionary structure:
+            {
+                "aws": {
+                    "com": {"access_key_id": "...", "secret_access_key": "...", "session_token": "..."},
+                    "gov": {"access_key_id": "...", "secret_access_key": "...", "session_token": "..."}
+                },
+                # Future: "azure": {...}, "gcp": {...}
+            }
+        """
+        return {
+            "aws": {
+                "com": {
+                    "access_key_id": self.AWS_ACCESS_KEY_ID_COM,
+                    "secret_access_key": self.AWS_SECRET_ACCESS_KEY_COM,
+                    "session_token": self.AWS_SESSION_TOKEN_COM,
+                },
+                "gov": {
+                    "access_key_id": self.AWS_ACCESS_KEY_ID_GOV,
+                    "secret_access_key": self.AWS_SECRET_ACCESS_KEY_GOV,
+                    "session_token": self.AWS_SESSION_TOKEN_GOV,
+                },
+            },
+            # Future: "azure": {...}, "gcp": {...}
+        }
 
 
-# Create settings instance
+# Global settings instance
 settings = Settings()

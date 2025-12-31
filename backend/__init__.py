@@ -1,1 +1,1 @@
-"""CloudOpsTools Backend Package"""
+"""Backend package for CloudOpsTools."""

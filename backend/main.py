@@ -1,20 +1,27 @@
-"""
-CloudOpsTools FastAPI Application
+"""CloudOpsTools Backend Application.
 
-Main entry point for the CloudOpsTools application.
+This module initializes the FastAPI application and registers all workflow routers
+using the provider abstraction layer. Workflows are provider-agnostic and support
+multiple cloud providers through a unified interface.
+
+Example usage:
+    # Start the server
+    poetry run uvicorn backend.main:app --reload --host 0.0.0.0 --port 8500
+
+    # Access API documentation
+    http://localhost:8500/docs
+    http://localhost:8500/redoc
 """
 
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from backend.core.config import settings
+from backend.web.workflows import auth, linux_qc_patching_prep, linux_qc_patching_post, sft_fixer
 
 # Configure logger with CloudOpsTools namespace
 logger = logging.getLogger("cloudopstools.main")
@@ -27,16 +34,38 @@ async def lifespan(app: FastAPI):
     yield
     logger.info(f"Shutting down {settings.APP_NAME}")
 
+# =============================================================================
+# Application Setup
+# =============================================================================
 
-# Create FastAPI application with CloudOpsTools branding
 app = FastAPI(
-    title=settings.APP_NAME,
-    description="CloudOpsTools - Cloud Operations Management Tools",
+    title=f"{settings.APP_NAME} API",
+    description="Provider-agnostic cloud operations tools for managing instances, "
+    "executing scripts, and running QC workflows across AWS, Azure, and GCP.",
     version=settings.VERSION,
     lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
 )
 
-# Add CORS middleware
+# =============================================================================
+# Middleware Configuration
+# =============================================================================
+
+# Session middleware for credential storage
+# Use HTTPS-only cookies in production for security
+is_production = settings.ENVIRONMENT.lower() == "production"
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.SECRET_KEY,
+    session_cookie="cloudopstools_session",
+    max_age=settings.SESSION_LIFETIME_MINUTES * 60,
+    same_site="strict" if is_production else "lax",
+    https_only=is_production,
+)
+
+# CORS middleware for frontend access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -45,32 +74,68 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Add session middleware with CloudOpsTools session cookie
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=settings.SECRET_KEY,
-    session_cookie="cloudopstools-session",
-    max_age=1800,  # 30 minutes
-    same_site="lax",
-    https_only=False,
+# =============================================================================
+# Router Registration
+# =============================================================================
+
+# Authentication router - handles provider authentication and session management
+app.include_router(
+    auth.router,
+    prefix="/auth",
+    tags=["Authentication"],
+)
+
+# Linux QC Patching Prep router - pre-patching validation workflows
+app.include_router(
+    linux_qc_patching_prep.router,
+    prefix="/linux-qc-prep",
+    tags=["Linux QC Prep"],
+)
+
+# Linux QC Patching Post router - post-patching validation workflows
+app.include_router(
+    linux_qc_patching_post.router,
+    prefix="/linux-qc-post",
+    tags=["Linux QC Post"],
+)
+
+# SFT Fixer router - system fix tool and remediation workflows
+app.include_router(
+    sft_fixer.router,
+    prefix="/sft-fixer",
+    tags=["SFT Fixer"],
 )
 
 
-@app.get("/api/health")
-async def health_check():
-    """Health check endpoint"""
+# =============================================================================
+# Root Endpoints
+# =============================================================================
+
+
+@app.get("/", tags=["Root"])
+async def root():
+    """Root endpoint returning API information.
+
+    Returns:
+        Dictionary with API name, version, and documentation links.
+    """
     return {
-        "status": "healthy",
-        "app": settings.APP_NAME,
+        "name": "CloudOpsTools API",
         "version": settings.VERSION,
+        "docs": "/docs",
+        "redoc": "/redoc",
+        "openapi": "/openapi.json",
     }
 
 
-@app.get("/")
-async def root():
-    """Root endpoint"""
+@app.get("/health", tags=["Health"])
+async def health_check():
+    """Health check endpoint for monitoring and load balancers.
+
+    Returns:
+        Dictionary with health status.
+    """
     return {
-        "message": f"Welcome to {settings.APP_NAME}",
-        "version": settings.VERSION,
-        "docs": "/docs",
+        "status": "healthy",
+        "default_provider": settings.DEFAULT_PROVIDER,
     }
