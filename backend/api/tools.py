@@ -5,7 +5,7 @@ This module provides tool management endpoints including tool execution.
 Execution endpoints are rate limited more strictly due to resource consumption.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -15,6 +15,22 @@ from backend.core.limiter import limiter
 
 # Create router for tools endpoints
 router = APIRouter(prefix="/api/tools", tags=["tools"])
+
+
+class ToolResponse(BaseModel):
+    """Response model for a single tool."""
+
+    id: str
+    name: str
+    description: str
+    enabled: bool
+
+
+class ToolListResponse(BaseModel):
+    """Response model for listing tools."""
+
+    tools: List[ToolResponse]
+    total: int
 
 
 class ToolExecuteRequest(BaseModel):
@@ -56,6 +72,54 @@ _tools_store: Dict[str, Dict[str, Any]] = {
         "enabled": False,
     },
 }
+
+
+@router.get("/", response_model=ToolListResponse)
+@limiter.limit(settings.rate_limit_read_endpoints)
+async def list_tools(request: Request):
+    """
+    List all available tools.
+
+    This endpoint returns all tools in the system regardless of their
+    enabled status.
+
+    Rate limit: 100 requests per minute per IP address.
+
+    Args:
+        request: FastAPI request object (required for rate limiting)
+
+    Returns:
+        ToolListResponse with list of all tools and total count
+    """
+    tools = [ToolResponse(**tool) for tool in _tools_store.values()]
+    return ToolListResponse(tools=tools, total=len(tools))
+
+
+@router.get("/{tool_id}", response_model=ToolResponse)
+@limiter.limit(settings.rate_limit_read_endpoints)
+async def get_tool(request: Request, tool_id: str):
+    """
+    Get a specific tool by its ID.
+
+    Rate limit: 100 requests per minute per IP address.
+
+    Args:
+        request: FastAPI request object (required for rate limiting)
+        tool_id: The unique identifier of the tool
+
+    Returns:
+        ToolResponse with the tool details
+
+    Raises:
+        HTTPException: If tool not found
+    """
+    tool = _tools_store.get(tool_id)
+    if not tool:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Tool with ID '{tool_id}' not found"
+        )
+    return ToolResponse(**tool)
 
 
 @router.post("/{tool_id}/execute", response_model=ToolExecuteResponse)
