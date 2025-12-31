@@ -1,88 +1,108 @@
-"""Provider package for dynamic tool discovery"""
+"""Cloud provider abstraction layer.
 
-import logging
-import pkgutil
-from importlib import import_module
-from typing import Any, Dict, List
+This module provides a provider abstraction pattern for multi-cloud support.
+It includes a registry of available providers and a factory function for
+instantiating providers by name.
 
-from fastapi import FastAPI
+Example usage:
+    from backend.providers import get_provider, list_providers
 
-logger = logging.getLogger(__name__)
+    # Get list of available providers
+    providers = list_providers()  # ["aws"]
+
+    # Create a provider instance
+    provider = get_provider("aws", {"access_key": "...", "secret_key": "..."})
+
+    # Use the provider interface
+    is_valid = await provider.validate_credentials(credentials)
+"""
+
+from typing import Any, Dict, List, Type
+
+from backend.providers.aws import AWSProvider
+from backend.providers.base import ProviderBase
+
+# Provider registry mapping provider names to their implementation classes
+# New providers are registered here as they are implemented
+_PROVIDER_REGISTRY: Dict[str, Type[ProviderBase]] = {
+    "aws": AWSProvider,
+    # Future: "azure": AzureProvider, "gcp": GCPProvider
+}
 
 
-def discover_provider_routers(app: FastAPI) -> Dict[str, List[Dict[str, Any]]]:
-    """Discover and import all provider routers dynamically"""
-    # Dynamically discover provider directories
-    import os
+def register_provider(name: str, provider_class: Type[ProviderBase]) -> None:
+    """Register a provider implementation in the registry.
 
-    provider_dir = os.path.dirname(os.path.abspath(__file__))
-    providers = []
+    Args:
+        name: Provider identifier (e.g., "aws", "azure", "gcp").
+        provider_class: Provider class implementing ProviderBase.
 
-    for item in os.listdir(provider_dir):
-        item_path = os.path.join(provider_dir, item)
-        # Skip non-directories, hidden files, __pycache__, and other non-provider items
-        if (
-            os.path.isdir(item_path)
-            and not item.startswith(".")
-            and not item.startswith("__")
-            and item not in ["README.md"]
-        ):
-            providers.append(item)
+    Raises:
+        TypeError: If provider_class does not inherit from ProviderBase.
+        ValueError: If provider name is already registered.
+    """
+    if not issubclass(provider_class, ProviderBase):
+        raise TypeError(
+            f"Provider class must inherit from ProviderBase, got {provider_class}"
+        )
+    if name in _PROVIDER_REGISTRY:
+        raise ValueError(f"Provider '{name}' is already registered")
+    _PROVIDER_REGISTRY[name] = provider_class
 
-    # Sort providers for consistent ordering
-    providers.sort()
-    logger.info(f"Discovered providers: {providers}")
 
-    # Track discovered routers for the providers endpoint
-    discovered_providers: Dict[str, List[Dict[str, Any]]] = {}
+def get_provider(provider_name: str, credentials: Dict[str, Any]) -> ProviderBase:
+    """Factory function to get a provider instance.
 
-    for provider in providers:
-        try:
-            # Try to import the provider package
-            provider_pkg = import_module(f"backend.providers.{provider}")
-            logger.info(f"Discovered provider: {provider}")
-            discovered_providers[provider] = []
+    Creates and returns an instance of the specified provider, initialized
+    with the provided credentials.
 
-            # Look for tools in this provider
-            tools_path = provider_pkg.__path__
-            for tool_mod in pkgutil.iter_modules(tools_path):
-                tool_name = tool_mod.name
+    Args:
+        provider_name: Provider identifier (e.g., "aws", "azure", "gcp").
+        credentials: Provider-specific credential dictionary.
 
-                # Skip the common module which isn't a tool
-                if tool_name == "common":
-                    continue
+    Returns:
+        An instance of the requested provider implementing ProviderBase.
 
-                try:
-                    # Import the tool module and check if it has routers
-                    tool_pkg = import_module(
-                        f"backend.providers.{provider}.{tool_name}"
-                    )
+    Raises:
+        ValueError: If provider_name is not registered.
 
-                    if hasattr(tool_pkg, "routers"):
-                        # Register all routers from this tool
-                        for router, prefix in tool_pkg.routers:
-                            tag = f"{provider.upper()} {tool_name.replace('_', ' ').title()}"
-                            app.include_router(
-                                router, prefix=f"/api{prefix}", tags=[tag]
-                            )
+    Example:
+        provider = get_provider("aws", {
+            "access_key_id": "AKIA...",
+            "secret_access_key": "..."
+        })
+    """
+    if provider_name not in _PROVIDER_REGISTRY:
+        available = list(_PROVIDER_REGISTRY.keys())
+        raise ValueError(
+            f"Unknown provider: '{provider_name}'. "
+            f"Available providers: {available or 'none registered'}"
+        )
 
-                        # Add to discovered providers for the providers endpoint
-                        tool_info = {
-                            "name": tool_name,
-                            "description": (
-                                tool_pkg.__doc__.split("\n")[0]
-                                if tool_pkg.__doc__
-                                else ""
-                            ),
-                            "endpoints": [
-                                f"/api{prefix}" for _, prefix in tool_pkg.routers
-                            ],
-                        }
-                        discovered_providers[provider].append(tool_info)
-                        logger.info(f"Registered tool: {provider}.{tool_name}")
-                except (ImportError, AttributeError) as e:
-                    logger.warning(f"Could not load tool {provider}.{tool_name}: {e}")
-        except ImportError as e:
-            logger.debug(f"Provider {provider} not available: {e}")
+    provider_class = _PROVIDER_REGISTRY[provider_name]
+    return provider_class(credentials)
 
-    return discovered_providers
+
+def list_providers() -> List[str]:
+    """List all registered provider names.
+
+    Returns:
+        List of registered provider identifiers.
+    """
+    return list(_PROVIDER_REGISTRY.keys())
+
+
+def is_provider_registered(provider_name: str) -> bool:
+    """Check if a provider is registered.
+
+    Args:
+        provider_name: Provider identifier to check.
+
+    Returns:
+        True if the provider is registered, False otherwise.
+    """
+    return provider_name in _PROVIDER_REGISTRY
+
+
+# Re-export base classes and providers for convenience
+__all__ = ["AWSProvider", "ProviderBase", "get_provider", "is_provider_registered", "list_providers", "register_provider"]

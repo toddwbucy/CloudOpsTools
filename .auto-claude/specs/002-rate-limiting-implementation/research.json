@@ -1,0 +1,220 @@
+{
+  "integrations_researched": [
+    {
+      "name": "SlowAPI",
+      "type": "library",
+      "purpose": "Primary rate limiting library for FastAPI applications",
+      "verified_package": {
+        "name": "slowapi",
+        "install_command": "pip install slowapi",
+        "recommended_version": ">=0.1.9",
+        "verified": true,
+        "verification_source": "Context7 MCP (/laurents/slowapi)"
+      },
+      "api_patterns": {
+        "imports": [
+          "from slowapi import Limiter, _rate_limit_exceeded_handler",
+          "from slowapi.util import get_remote_address",
+          "from slowapi.errors import RateLimitExceeded"
+        ],
+        "initialization": "limiter = Limiter(key_func=get_remote_address, default_limits=[\"100/hour\"])",
+        "fastapi_integration": "app.state.limiter = limiter\napp.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)",
+        "endpoint_decorator": "@limiter.limit(\"5/minute\")\nasync def endpoint(request: Request):\n    ...",
+        "key_functions": [
+          "limiter.limit(rate_limit: str) - Decorator to apply rate limit to endpoint",
+          "get_remote_address(request) - Extract client IP from request",
+          "RateLimitExceeded - Exception raised when limit exceeded"
+        ],
+        "verified_against": "Context7 MCP (/laurents/slowapi) + Training data knowledge"
+      },
+      "configuration": {
+        "storage_backends": [
+          "in-memory (default, suitable for single-instance deployments)",
+          "Redis (recommended for distributed/production deployments)"
+        ],
+        "env_vars": [
+          "RATE_LIMIT_AUTH_ENDPOINTS - e.g., '10/minute'",
+          "RATE_LIMIT_EXECUTION_ENDPOINTS - e.g., '5/minute'",
+          "RATE_LIMIT_READ_ENDPOINTS - e.g., '100/minute'",
+          "REDIS_URL - if using Redis backend (e.g., 'redis://localhost:6379')"
+        ],
+        "config_integration": "Add to backend/core/config.py Settings class using Pydantic Field",
+        "dependencies": [
+          "fastapi (already present)",
+          "redis (optional, for Redis backend)"
+        ]
+      },
+      "infrastructure": {
+        "requires_docker": false,
+        "optional_docker": {
+          "service": "Redis",
+          "docker_image": "redis:7-alpine",
+          "ports": [6379],
+          "note": "Only needed for distributed rate limiting across multiple app instances"
+        }
+      },
+      "features": {
+        "http_429_support": true,
+        "retry_after_header": true,
+        "per_endpoint_limits": true,
+        "multiple_limit_tiers": true,
+        "custom_key_functions": true,
+        "exempt_endpoints": true,
+        "description": "Automatically returns HTTP 429 with Retry-After header when limits exceeded"
+      },
+      "integration_points": {
+        "fastapi_app": "backend/main.py - Add limiter to app.state and exception handler",
+        "configuration": "backend/core/config.py - Add rate limit settings to Settings class",
+        "api_routers": [
+          "backend/api/auth.py - Authentication endpoints",
+          "backend/api/scripts.py - Execution endpoints",
+          "backend/api/tools.py - Read endpoints"
+        ],
+        "health_endpoint": "backend/main.py line 149 - Add rate limit metrics to health check"
+      },
+      "gotchas": [
+        "In-memory backend does NOT work across multiple app instances - use Redis for production with multiple workers",
+        "Rate limit key function (get_remote_address) may not work correctly behind proxies - need to configure trusted proxies",
+        "Default key function uses IP address - consider using authenticated user ID for better per-user limits",
+        "Limits are per-instance by default - need Redis for shared rate limiting state",
+        "Must add limiter to app.state before applying decorators to ensure FastAPI can access it"
+      ],
+      "research_sources": [
+        "Context7 MCP: /laurents/slowapi (94.6 benchmark score, High reputation)",
+        "GitHub: https://github.com/laurents/slowapi",
+        "PyPI: https://pypi.org/project/slowapi/",
+        "Documentation: https://slowapi.readthedocs.io/"
+      ],
+      "alternatives_considered": [
+        {
+          "name": "fastapi-limiter",
+          "reason_not_chosen": "Requires Redis as mandatory dependency; SlowAPI more flexible with in-memory option"
+        },
+        {
+          "name": "aiolimiter",
+          "reason_not_chosen": "Low-level library, requires more manual integration; SlowAPI provides higher-level FastAPI integration"
+        }
+      ]
+    },
+    {
+      "name": "Redis",
+      "type": "infrastructure",
+      "purpose": "Optional backend for distributed rate limiting in production",
+      "verified_package": {
+        "name": "redis",
+        "install_command": "pip install redis[hiredis]",
+        "recommended_version": ">=4.5.0",
+        "verified": true,
+        "note": "hiredis extra provides performance improvements"
+      },
+      "api_patterns": {
+        "imports": [
+          "from slowapi.middleware import SlowAPIMiddleware",
+          "from slowapi.util import get_remote_address",
+          "import redis"
+        ],
+        "initialization": "from slowapi import Limiter\nfrom slowapi.util import get_remote_address\nimport redis\n\nredis_client = redis.from_url(settings.REDIS_URL)\nlimiter = Limiter(key_func=get_remote_address, storage_uri=settings.REDIS_URL)",
+        "key_functions": [
+          "redis.from_url(url) - Create Redis client from connection URL",
+          "Storage handled automatically by SlowAPI when storage_uri provided"
+        ],
+        "verified_against": "Redis Python client documentation + SlowAPI documentation"
+      },
+      "configuration": {
+        "env_vars": [
+          "REDIS_URL - Connection string (e.g., 'redis://localhost:6379/0')",
+          "REDIS_PASSWORD - Optional password for Redis authentication",
+          "REDIS_DB - Optional database number (default: 0)"
+        ],
+        "optional": true,
+        "when_needed": "Only required for production deployments with multiple app instances or horizontal scaling"
+      },
+      "infrastructure": {
+        "requires_docker": false,
+        "recommended_docker": true,
+        "docker_image": "redis:7-alpine",
+        "ports": [6379],
+        "docker_compose_example": "redis:\n  image: redis:7-alpine\n  ports:\n    - \"6379:6379\"\n  volumes:\n    - redis_data:/data"
+      },
+      "gotchas": [
+        "Not required for development or single-instance deployments",
+        "Connection failures to Redis will cause rate limiting to fail - need error handling",
+        "Redis persistence should be configured for production to avoid losing rate limit state on restart"
+      ],
+      "research_sources": [
+        "Redis Python client documentation",
+        "SlowAPI Redis integration documentation",
+        "Training data knowledge of Redis deployment patterns"
+      ]
+    }
+  ],
+  "codebase_context": {
+    "framework": "FastAPI",
+    "python_version": "^3.11",
+    "configuration_system": "Pydantic Settings with .env file support",
+    "existing_middleware": [
+      "SessionMiddleware",
+      "CORSMiddleware",
+      "SecurityHeadersMiddleware",
+      "CSRFProtectionMiddleware"
+    ],
+    "config_file": "backend/core/config.py",
+    "main_app_file": "backend/main.py",
+    "health_endpoint": "/api/health (line 149 in backend/main.py)",
+    "api_routers": {
+      "auth": "/api/auth (backend/api/auth.py)",
+      "scripts": "/api/scripts (backend/api/scripts.py)",
+      "tools": "/api/tools (backend/api/tools.py)",
+      "feature_flags": "/api (backend/api/feature_flags.py)"
+    },
+    "current_rate_limiting": "None - No rate limiting currently implemented (verified via grep)"
+  },
+  "endpoint_categorization": {
+    "authentication_endpoints": {
+      "location": "backend/api/auth.py",
+      "suggested_limit": "10/minute per IP (stricter to prevent brute force)",
+      "pattern": "/api/auth/*"
+    },
+    "execution_endpoints": {
+      "location": "backend/api/scripts.py",
+      "suggested_limit": "5/minute per IP (resource-intensive operations)",
+      "pattern": "/api/scripts/execute, /api/tools/execute"
+    },
+    "read_endpoints": {
+      "location": "backend/api/scripts.py, backend/api/tools.py",
+      "suggested_limit": "100/minute per IP (lighter operations)",
+      "pattern": "/api/scripts/list, /api/tools/list, /api/health"
+    }
+  },
+  "unverified_claims": [],
+  "recommendations": [
+    "Start with in-memory SlowAPI backend for development and single-instance production deployments",
+    "Consider Redis backend only if deploying multiple app instances or implementing horizontal scaling",
+    "Use IP-based rate limiting initially (get_remote_address), but consider user-based limiting for authenticated endpoints",
+    "Configure health endpoint to expose rate limit metrics using slowapi's built-in hit count tracking",
+    "Implement rate limit configuration via environment variables in Settings class for runtime configurability",
+    "Add rate limit decorators to routers rather than individual endpoints for consistency",
+    "Use different rate limit tiers: auth (10/min), execution (5/min), read (100/min) as starting values",
+    "Consider implementing custom rate limit key function that uses authenticated user ID instead of IP for better fairness",
+    "Add monitoring/logging when rate limits are hit to track potential abuse patterns",
+    "Document rate limits in API documentation (FastAPI OpenAPI/Swagger)"
+  ],
+  "implementation_notes": {
+    "minimal_dependencies": "Only slowapi required for basic implementation",
+    "production_ready": "SlowAPI is production-ready and widely used in FastAPI ecosystem",
+    "testing_considerations": "Rate limiting can interfere with tests - consider exempting test client or using higher limits in test environment",
+    "graceful_degradation": "SlowAPI automatically handles 429 responses - no risk of application crashes",
+    "backward_compatibility": "Adding rate limiting is non-breaking - existing clients will just see 429 responses if they exceed limits"
+  },
+  "security_considerations": {
+    "dos_prevention": "Rate limiting effectively prevents DoS attacks by limiting request rates per IP/user",
+    "brute_force_protection": "Stricter limits on auth endpoints prevent credential brute-force attacks",
+    "proxy_awareness": "Behind reverse proxies (nginx, etc.), configure FastAPI to trust X-Forwarded-For headers",
+    "bypass_risks": "IP-based limiting can be bypassed by distributed attacks - consider implementing additional security layers"
+  },
+  "created_at": "2024-12-30T21:00:00Z",
+  "research_agent_version": "1.0",
+  "context7_libraries_used": [
+    "/laurents/slowapi"
+  ]
+}

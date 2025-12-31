@@ -211,3 +211,8 @@ __marimo__/
 .auto-claude-status
 .claude_settings.json
 CLAUDE.md
+
+# Database files
+*.db
+*.db-journal
+data/

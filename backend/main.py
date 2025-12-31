@@ -1,11 +1,27 @@
+"""CloudOpsTools Backend Application.
+
+This module initializes the FastAPI application and registers all workflow routers
+using the provider abstraction layer. Workflows are provider-agnostic and support
+multiple cloud providers through a unified interface.
+
+Example usage:
+    # Start the server
+    poetry run uvicorn backend.main:app --reload --host 0.0.0.0 --port 8500
+
+    # Access API documentation
+    http://localhost:8500/docs
+    http://localhost:8500/redoc
+"""
+
 import logging
 import sys
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from starlette.middleware.sessions import SessionMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -16,37 +32,37 @@ from backend.db.base import Base
 from backend.db.models import account as _model_account  # noqa: F401
 from backend.db.models import change as _model_change  # noqa: F401
 from backend.db.models import execution as _model_execution  # noqa: F401
+from backend.web.workflows import auth, linux_qc_patching_prep, linux_qc_patching_post, sft_fixer
 
-# Ensure all models (including auxiliary storage) are registered before create_all
-from backend.db.models import script as _model_script  # noqa: F401
-from backend.db.models import session_store as _model_session_store  # noqa: F401
-from backend.db.session import engine
-from backend.web import home
-from backend.web.aws import auth as aws_auth
-from backend.web.aws import linux_qc_patching_post as linux_qc_patching_post_web
+# Configure logger with CloudOpsTools namespace
+logger = logging.getLogger("cloudopstools.main")
 
-# script_runner removed - functionality moved to backend service
-from backend.web.aws import linux_qc_patching_prep as linux_qc_patching_prep_web
-from backend.web.aws import sft_fixer as sft_fixer_web
 
-# Get the backend directory path
-BACKEND_DIR = Path(__file__).parent
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan management"""
+    logger.info(f"Starting {settings.APP_NAME} v{settings.VERSION}")
+    yield
+    logger.info(f"Shutting down {settings.APP_NAME}")
 
-# Initialize structured logging
-from backend.core.utils.logging_config import init_application_logging
-init_application_logging()
+# =============================================================================
+# Application Setup
+# =============================================================================
 
-logger = logging.getLogger("pcm_ops_tools.main")
-
-# Create database tables
-Base.metadata.create_all(bind=engine)
-
-# Create FastAPI app
 app = FastAPI(
-    title="PCM-Ops Tools",
-    description="Unified platform for cloud operations management",
-    version="2.0.0",
+    title=f"{settings.APP_NAME} API",
+    description="Provider-agnostic cloud operations tools for managing instances, "
+    "executing scripts, and running QC workflows across AWS, Azure, and GCP.",
+    version=settings.VERSION,
+    lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
 )
+
+# =============================================================================
+# Rate Limiting Setup
+# =============================================================================
 
 # Attach limiter to app.state for access in route decorators
 # This must be done before applying @limiter.limit() decorators
@@ -63,17 +79,23 @@ logger.info(
     settings.rate_limit_read_endpoints,
 )
 
-# Add session middleware
+# =============================================================================
+# Middleware Configuration
+# =============================================================================
+
+# Session middleware for credential storage
+# Use HTTPS-only cookies in production for security
+is_production = settings.ENVIRONMENT.lower() == "production"
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.SECRET_KEY,
-    session_cookie="pcm-ops-session",
-    max_age=1800,  # 30 minutes
-    https_only=settings.ENVIRONMENT == "production",
-    same_site="lax",  # Allow cookies in form submissions
+    session_cookie="cloudopstools_session",
+    max_age=settings.SESSION_LIFETIME_MINUTES * 60,
+    same_site="strict" if is_production else "lax",
+    https_only=is_production,
 )
 
-# Configure CORS (restrict origins; credentials require explicit origins)
+# CORS middleware for frontend access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -82,85 +104,65 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Add security headers middleware for XSS protection
-from backend.core.security import SecurityHeadersMiddleware, CSRFProtectionMiddleware
-app.add_middleware(SecurityHeadersMiddleware)
-app.add_middleware(CSRFProtectionMiddleware, secret_key=settings.SECRET_KEY)
+# =============================================================================
+# Router Registration
+# =============================================================================
 
-# Mount static files
-app.mount("/static", StaticFiles(directory=str(BACKEND_DIR / "static")), name="static")
-
-# Configure templates with custom globals
-templates = Jinja2Templates(directory=str(BACKEND_DIR / "templates"))
-
-
-# Add Flask-compatible template functions
-def get_flashed_messages(with_categories=False):
-    """Stub for Flask's get_flashed_messages - returns empty list"""
-    if with_categories:
-        return []  # Return empty list of tuples when categories requested
-    return []
-
-
-templates.env.globals["get_flashed_messages"] = get_flashed_messages
-
-# Add CSRF token generation function to template globals
-from backend.core.security import generate_csrf_token_for_template, get_current_nonce
-templates.env.globals["csrf_token"] = generate_csrf_token_for_template
-templates.env.globals["csp_nonce"] = get_current_nonce
-
-# Import and include API routers
-from backend.api import auth, scripts, tools, feature_flags
-
-app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
-app.include_router(scripts.router, prefix="/api/scripts", tags=["Scripts"])
-app.include_router(tools.router, prefix="/api/tools", tags=["Tools"])
-app.include_router(feature_flags.router, prefix="/api", tags=["Feature Flags"])
-
-# Include web routers
-app.include_router(home.router, tags=["Web"])
-app.include_router(aws_auth.router, tags=["AWS Authentication Web"])
-# Script Runner has been removed - functionality moved to backend-only service
-# and exposed through specialized tools like Linux QC Patching
+# Authentication router - handles provider authentication and session management
 app.include_router(
-    linux_qc_patching_prep_web.router, prefix="/aws/linux-qc-patching-prep", tags=["AWS Linux QC Patching Prep Web"]
-)
-app.include_router(
-    linux_qc_patching_post_web.router, prefix="/aws/linux-qc-patching-post", tags=["AWS Linux QC Patching Post Web"]
-)
-app.include_router(
-    sft_fixer_web.router, prefix="/aws/sft-fixer", tags=["AWS SFT Fixer Web"]
+    auth.router,
+    prefix="/auth",
+    tags=["Authentication"],
 )
 
-# Add redirects from old URLs to new URLs for backward compatibility
-from fastapi.responses import RedirectResponse
+# Linux QC Patching Prep router - pre-patching validation workflows
+app.include_router(
+    linux_qc_patching_prep.router,
+    prefix="/linux-qc-prep",
+    tags=["Linux QC Prep"],
+)
+
+# Linux QC Patching Post router - post-patching validation workflows
+app.include_router(
+    linux_qc_patching_post.router,
+    prefix="/linux-qc-post",
+    tags=["Linux QC Post"],
+)
+
+# SFT Fixer router - system fix tool and remediation workflows
+app.include_router(
+    sft_fixer.router,
+    prefix="/sft-fixer",
+    tags=["SFT Fixer"],
+)
+
+# Rate Limiting API routers - demonstration endpoints for rate limiting
+from backend.api.auth import router as api_auth_router
+from backend.api.tools import router as api_tools_router
+
+app.include_router(api_auth_router, prefix="/api", tags=["Rate Limited API"])
+app.include_router(api_tools_router, prefix="/api", tags=["Rate Limited API"])
 
 
-@app.get("/aws/linux-patcher")
-@app.get("/aws/linux-patcher/{path:path}")
-async def redirect_old_linux_patcher(path: str = ""):
-    """Redirect old Linux Patcher URLs to new Linux QC Patching Prep URLs"""
-    new_url = f"/aws/linux-qc-patching-prep/{path}" if path else "/aws/linux-qc-patching-prep"
-    return RedirectResponse(url=new_url, status_code=301)
+# =============================================================================
+# Root Endpoints
+# =============================================================================
 
-@app.get("/aws/linux-qc-prep")
-@app.get("/aws/linux-qc-prep/{path:path}")
-async def redirect_old_qc_prep(path: str = ""):
-    """Redirect old Linux QC Prep URLs to new Linux QC Patching Prep URLs"""
-    new_url = f"/aws/linux-qc-patching-prep/{path}" if path else "/aws/linux-qc-patching-prep"
-    return RedirectResponse(url=new_url, status_code=301)
 
-@app.get("/aws/linux-qc-post")
-@app.get("/aws/linux-qc-post/{path:path}")
-async def redirect_old_qc_post(path: str = ""):
-    """Redirect old Linux QC Post URLs to new Linux QC Patching Post URLs"""
-    new_url = f"/aws/linux-qc-patching-post/{path}" if path else "/aws/linux-qc-patching-post"
-    return RedirectResponse(url=new_url, status_code=301)
+@app.get("/", tags=["Root"])
+async def root():
+    """Root endpoint returning API information.
 
-# Dynamically discover and include provider API routers
-from backend.providers import discover_provider_routers
-
-provider_info = discover_provider_routers(app)
+    Returns:
+        Dictionary with API name, version, and documentation links.
+    """
+    return {
+        "name": "CloudOpsTools API",
+        "version": settings.VERSION,
+        "docs": "/docs",
+        "redoc": "/redoc",
+        "openapi": "/openapi.json",
+    }
 
 
 def _check_storage_health() -> dict:
@@ -336,10 +338,3 @@ def api_health_check():
         Response.status_code = 503  # Service unavailable
     
     return health_status
-
-
-# Providers endpoint
-@app.get("/api/providers")
-def list_providers():
-    """List all available providers and tools"""
-    return {"providers": provider_info}

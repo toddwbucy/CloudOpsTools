@@ -1,0 +1,72 @@
+{
+  "complexity": "standard",
+  "workflow_type": "feature",
+  "confidence": 0.85,
+  "reasoning": "Rate limiting is a cross-cutting middleware feature requiring multiple files (middleware, config, health endpoint integration, tests) but scope is contained to a single service. Requires research for FastAPI rate limiting libraries and endpoint categorization strategy, but no infrastructure changes or external integrations.",
+
+  "analysis": {
+    "scope": {
+      "estimated_files": 7,
+      "estimated_services": 1,
+      "is_cross_cutting": true,
+      "notes": "Middleware affects all 84 API endpoints. Will need: rate limiting middleware, configuration module, health endpoint modifications, endpoint categorization logic, tests, and possibly utility modules."
+    },
+    "integrations": {
+      "external_services": [],
+      "new_dependencies": ["slowapi or fastapi-limiter"],
+      "research_needed": true,
+      "notes": "Need to evaluate FastAPI rate limiting libraries (slowapi, fastapi-limiter, etc.) and select best fit. Well-documented libraries available but requires research for proper implementation patterns."
+    },
+    "infrastructure": {
+      "docker_changes": false,
+      "database_changes": false,
+      "config_changes": true,
+      "notes": "New environment variables needed for rate limit configuration (limits per endpoint category, time windows). No Docker or database infrastructure changes required - rate limiting typically uses in-memory storage."
+    },
+    "knowledge": {
+      "patterns_exist": false,
+      "research_required": true,
+      "unfamiliar_tech": ["rate limiting library", "FastAPI middleware patterns"],
+      "notes": "No existing rate limiting or middleware patterns in codebase. Need research on: (1) FastAPI rate limiting libraries and best practices, (2) endpoint categorization strategies for 84 routes, (3) integration with existing health endpoint system."
+    },
+    "risk": {
+      "level": "medium",
+      "concerns": [
+        "Could block legitimate traffic if rate limits misconfigured",
+        "Performance impact on every request (middleware overhead)",
+        "Endpoint categorization must be maintainable as routes grow",
+        "Must not break existing health endpoint monitoring",
+        "Need proper handling for distributed systems if multiple instances run"
+      ],
+      "notes": "Security-critical feature. Requires careful testing to ensure legitimate traffic isn't blocked while malicious traffic is. Different limits per category (auth, execution, read) adds complexity."
+    }
+  },
+
+  "recommended_phases": [
+    "discovery",
+    "requirements",
+    "research",
+    "context",
+    "spec_writing",
+    "planning",
+    "validation"
+  ],
+
+  "flags": {
+    "needs_research": true,
+    "needs_self_critique": false,
+    "needs_infrastructure_setup": false
+  },
+
+  "validation_recommendations": {
+    "risk_level": "high",
+    "skip_validation": false,
+    "minimal_mode": false,
+    "test_types_required": ["unit", "integration", "e2e"],
+    "security_scan_required": false,
+    "staging_deployment_required": false,
+    "reasoning": "Security-critical middleware affecting all 84 endpoints requires comprehensive testing. Unit tests for rate limiting logic, integration tests for HTTP 429 responses and Retry-After headers, and E2E tests to verify legitimate traffic flows while malicious traffic is blocked. No security scan needed as this doesn't handle sensitive data directly."
+  },
+
+  "created_at": "2025-01-23T00:00:00Z"
+}
