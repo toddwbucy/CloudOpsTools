@@ -40,7 +40,10 @@ wait_for_service() {
 
 echo ""
 echo "Installing Python dependencies..."
-cd /home/todd/git/CloudOpsTools
+# Assuming the script is in .auto-claude/specs/002-rate-limiting-implementation/
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/../../.." && pwd )"
+cd "$PROJECT_ROOT"
 poetry install
 
 # ============================================

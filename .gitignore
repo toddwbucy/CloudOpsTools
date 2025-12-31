@@ -205,3 +205,8 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Claude Code - local configuration and status files
+.auto-claude-status
+.auto-claude/specs/*/memory/build_commits.json
+.auto-claude/specs/*/memory/

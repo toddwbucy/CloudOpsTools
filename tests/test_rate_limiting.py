@@ -11,6 +11,26 @@ from fastapi.testclient import TestClient
 from backend.main import app
 
 
+@pytest.fixture(autouse=True)
+def reset_limiter():
+    """Reset rate limiter state before each test to ensure test isolation.
+
+    This fixture runs automatically before each test to clear the limiter's
+    in-memory storage, preventing tests from affecting each other due to
+    accumulated rate limit counters.
+    """
+    # Clear the limiter's storage before each test
+    if hasattr(app.state, "limiter") and app.state.limiter:
+        # SlowAPI's in-memory storage can be cleared via the storage backend
+        if hasattr(app.state.limiter, "_storage"):
+            app.state.limiter._storage.storage.clear()
+    yield
+    # Cleanup after test (optional, but good practice)
+    if hasattr(app.state, "limiter") and app.state.limiter:
+        if hasattr(app.state.limiter, "_storage"):
+            app.state.limiter._storage.storage.clear()
+
+
 @pytest.fixture
 def client():
     """Create a test client for the FastAPI application."""
@@ -192,7 +212,7 @@ class TestRateLimitingConfiguration:
         assert "execution_endpoints" in rate_limiting["configuration"]
         assert "read_endpoints" in rate_limiting["configuration"]
 
-    def test_limiter_attached_to_app_state(self, client):
+    def test_limiter_attached_to_app_state(self):
         """Test that the limiter is properly attached to app.state."""
         assert hasattr(app.state, "limiter"), "Limiter must be attached to app.state"
         assert app.state.limiter is not None, "Limiter must not be None"
