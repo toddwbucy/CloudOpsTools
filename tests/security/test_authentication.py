@@ -84,18 +84,59 @@ class TestCSRFProtection:
         # - CSRF tokens should be unique per session
     
     def test_csrf_token_generation_endpoint(self, client):
-        """Test CSRF token generation endpoint (will be added in Phase 1)"""
-        # This endpoint doesn't exist yet, but will be added
+        """Test CSRF token generation endpoint
+
+        Validates that the /api/auth/csrf-token endpoint:
+        1. Returns a valid CSRF token when implemented
+        2. Token has sufficient length for security (> 20 chars)
+        3. Token is cryptographically random (unique per request)
+
+        If endpoint doesn't exist yet (404), test passes to allow development.
+        """
         response = client.get("/api/auth/csrf-token")
-        
-        # Should return 404 until Phase 1 implementation
-        assert response.status_code == 404
-        
-        # TODO: After Phase 1 implementation:
-        # assert response.status_code == 200
-        # data = response.json()
-        # assert "csrf_token" in data
-        # assert len(data["csrf_token"]) > 20
+
+        if response.status_code == 404:
+            # Endpoint not yet implemented - Phase 1 will add this
+            pass
+        elif response.status_code == 200:
+            # Endpoint exists - validate the response
+            data = response.json()
+
+            # CSRF token must be present in response
+            assert "csrf_token" in data, (
+                "Response missing 'csrf_token' field"
+            )
+
+            csrf_token = data["csrf_token"]
+
+            # Token must be a non-empty string
+            assert isinstance(csrf_token, str), (
+                f"CSRF token must be a string, got {type(csrf_token)}"
+            )
+            assert len(csrf_token) > 0, "CSRF token cannot be empty"
+
+            # Token must have sufficient length for security
+            # Minimum 20 chars (following OWASP recommendations)
+            assert len(csrf_token) >= 20, (
+                f"CSRF token too short ({len(csrf_token)} chars), "
+                "minimum 20 required for security"
+            )
+
+            # Verify token uniqueness by making another request
+            response2 = client.get("/api/auth/csrf-token")
+            if response2.status_code == 200:
+                data2 = response2.json()
+                csrf_token2 = data2.get("csrf_token", "")
+                # Tokens should be unique per request to prevent replay attacks
+                assert csrf_token != csrf_token2, (
+                    "CSRF tokens must be unique per request"
+                )
+        else:
+            # Unexpected status code
+            pytest.fail(
+                f"Unexpected status {response.status_code} from CSRF token endpoint. "
+                f"Expected 200 (success) or 404 (not implemented)."
+            )
 
 
 @pytest.mark.security
