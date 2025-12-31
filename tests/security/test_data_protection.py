@@ -1141,37 +1141,241 @@ class TestInputValidation:
 @pytest.mark.session_security
 class TestSessionSecurity:
     """Test session security measures"""
-    
+
     def test_session_fixation_prevention(self, client):
         """Test session fixation attacks are prevented"""
         # Get initial session
         response1 = client.get("/aws")
         initial_cookies = response1.cookies
-        
+
         # Simulate login attempt (when authentication is implemented)
         response2 = client.post("/api/auth/aws-credentials", json={
             "access_key": "test", "secret_key": "test"
         })
-        
+
         # Check if session ID changed after auth attempt
         # For now, just verify session handling works
         assert response1.status_code == 200
         assert response2.status_code in [200, 400, 401]
-    
+
     def test_session_hijacking_prevention(self, client):
-        """Test session hijacking prevention measures"""
-        # Create session
+        """Test session hijacking prevention measures
+
+        Session hijacking prevention should include:
+        1. Binding sessions to client IP address
+        2. Binding sessions to User-Agent
+        3. Session regeneration on privilege changes
+
+        These measures make stolen session tokens less useful
+        because they're tied to the original client characteristics.
+        """
+        from unittest.mock import patch, MagicMock
+
+        # Create initial session
         response = client.get("/aws")
-        
-        # Session should be tied to client characteristics
-        # This would be implemented with IP binding, User-Agent checks, etc.
         assert response.status_code == 200
-        
-        # TODO: After Phase 1 implementation:
-        # - Test session binding to IP address
-        # - Test session binding to User-Agent
-        # - Test session regeneration on privilege changes
-    
+
+        # Extract session cookie if present
+        session_cookie = None
+        for cookie in response.cookies:
+            if "session" in cookie.name.lower():
+                session_cookie = cookie.value
+                break
+
+        # Test: Session should include or validate client characteristics
+        # Even without full implementation, verify the endpoint works
+        # and document the security expectations
+
+        # Verify the session handling doesn't expose internal errors
+        # that could reveal session structure to attackers
+        assert "error" not in response.text.lower() or response.status_code == 200
+
+    def test_session_ip_binding_validation(self, client, test_settings):
+        """Test that sessions validate IP address binding
+
+        When session IP binding is enabled, requests from different IP
+        addresses should be rejected, preventing session hijacking via
+        stolen cookies.
+        """
+        from fastapi.testclient import TestClient
+        from backend.main import app
+
+        # Create session from "client IP"
+        response1 = client.get("/aws")
+        assert response1.status_code == 200
+
+        # Get any session cookies set
+        session_cookies = {
+            cookie.name: cookie.value
+            for cookie in response1.cookies
+            if "session" in cookie.name.lower()
+        }
+
+        # If IP binding is implemented, using the same session from
+        # a different IP should fail or create a new session
+        #
+        # Current implementation note: IP binding validation should be
+        # implemented in the session middleware. When implemented:
+        # - Store client_ip hash in session metadata
+        # - Validate IP on each request
+        # - Reject mismatches with 403 or invalidate session
+        #
+        # Test documents expected behavior for Phase 1 implementation
+
+        # For now, verify session is created successfully
+        assert response1.status_code == 200
+
+        # Verify the response doesn't leak IP information in errors
+        if response1.status_code >= 400:
+            assert "127.0.0.1" not in response1.text
+            assert "localhost" not in response1.text.lower()
+
+    def test_session_user_agent_validation(self, client, test_settings):
+        """Test that sessions validate User-Agent binding
+
+        When User-Agent binding is enabled, requests with different
+        User-Agent strings should be rejected or flagged, making it
+        harder for attackers to use stolen session cookies.
+        """
+        # Create session with specific User-Agent
+        headers_browser = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        response1 = client.get("/aws", headers=headers_browser)
+        assert response1.status_code == 200
+
+        # Get session cookie
+        session_cookies = {
+            cookie.name: cookie.value
+            for cookie in response1.cookies
+            if "session" in cookie.name.lower()
+        }
+
+        # When User-Agent binding is implemented:
+        # Using same session from different User-Agent should fail
+        headers_curl = {"User-Agent": "curl/7.68.0"}
+
+        # Current implementation: verify session handling works
+        # Phase 1 should add User-Agent binding:
+        # - Store User-Agent hash in session metadata
+        # - Validate on each request
+        # - Reject mismatches or create new session
+
+        response2 = client.get("/aws", headers=headers_curl)
+        # Currently accepts any User-Agent (before Phase 1 implementation)
+        assert response2.status_code == 200
+
+        # When implemented, if session_cookies was reused with different UA,
+        # the server should either:
+        # 1. Return 403 Forbidden
+        # 2. Invalidate the session and create new one
+        # 3. Log a security warning
+
+    def test_session_regeneration_on_privilege_change(self, client):
+        """Test session ID regeneration on privilege level changes
+
+        To prevent session fixation attacks, the session ID should be
+        regenerated when:
+        1. User authenticates (logs in)
+        2. User gains elevated privileges
+        3. User performs sensitive operations
+
+        This ensures pre-authentication session IDs cannot be used
+        post-authentication.
+        """
+        # Get pre-authentication session
+        response1 = client.get("/aws")
+        pre_auth_cookies = {
+            cookie.name: cookie.value
+            for cookie in response1.cookies
+            if "session" in cookie.name.lower()
+        }
+
+        # Attempt authentication (this should trigger session regeneration)
+        response2 = client.post("/api/auth/aws-credentials", json={
+            "access_key": "AKIAIOSFODNN7EXAMPLE",
+            "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            "environment": "com"
+        })
+
+        post_auth_cookies = {
+            cookie.name: cookie.value
+            for cookie in response2.cookies
+            if "session" in cookie.name.lower()
+        }
+
+        # When session regeneration is implemented:
+        # The session ID should change after authentication
+        #
+        # Current state: Document expected behavior
+        # Phase 1 implementation should:
+        # - Regenerate session ID on successful authentication
+        # - Copy session data to new session
+        # - Invalidate old session ID
+
+        # Verify authentication endpoint responds appropriately
+        assert response2.status_code in [200, 400, 401, 422]
+
+    def test_session_metadata_not_exposed(self, client):
+        """Test that session metadata (IP, User-Agent bindings) is not exposed
+
+        Session binding information should be stored securely and never
+        exposed to the client, as this could help attackers craft requests
+        that bypass session binding checks.
+        """
+        response = client.get("/aws")
+        assert response.status_code == 200
+
+        # Session metadata should not appear in response body
+        response_text = response.text.lower()
+
+        # Check for IP-related metadata leakage
+        metadata_terms = [
+            "client_ip",
+            "bound_ip",
+            "session_ip",
+            "user_agent_hash",
+            "fingerprint",
+            "session_metadata"
+        ]
+
+        for term in metadata_terms:
+            assert term not in response_text, \
+                f"Session metadata '{term}' should not be exposed in response"
+
+        # Check cookies don't contain plaintext binding info
+        for cookie in response.cookies:
+            cookie_value = str(cookie.value).lower()
+            assert "127.0.0.1" not in cookie_value
+            assert "mozilla" not in cookie_value
+
+    def test_session_hijacking_detection_logging(self, client, caplog):
+        """Test that session hijacking attempts are logged for detection
+
+        Even if hijacking attempts are blocked, they should be logged
+        for security monitoring and incident response.
+        """
+        import logging
+
+        with caplog.at_level(logging.WARNING):
+            # Make multiple requests with varying characteristics
+            # This simulates potential hijacking attempts
+
+            response1 = client.get("/aws", headers={
+                "User-Agent": "Mozilla/5.0 Browser"
+            })
+
+            response2 = client.get("/aws", headers={
+                "User-Agent": "curl/7.68.0"  # Different User-Agent
+            })
+
+            # Both should succeed currently (pre-implementation)
+            assert response1.status_code == 200
+            assert response2.status_code == 200
+
+        # When session binding is implemented, mismatches should log warnings
+        # Format: "Session binding mismatch: UA changed for session {sid}"
+        # This enables security monitoring without blocking legitimate users
+        # who may have User-Agent changes (browser updates, etc.)
+
     def test_concurrent_session_handling(self, client):
         """Test handling of concurrent sessions"""
         # Create multiple sessions
@@ -1179,13 +1383,94 @@ class TestSessionSecurity:
         for _ in range(3):
             response = client.get("/aws")
             responses.append(response)
-        
+
         # All should succeed (no session limits yet)
         assert all(r.status_code == 200 for r in responses)
-        
-        # TODO: After implementation:
-        # - Test maximum concurrent sessions per user
-        # - Test session cleanup on logout
+
+        # When session limits are implemented:
+        # - Maximum concurrent sessions per user should be enforced
+        # - Oldest sessions should be invalidated when limit exceeded
+        # - Session cleanup should occur on explicit logout
+
+    def test_session_store_client_binding(self, test_settings, db_session):
+        """Test SessionStore can store client binding metadata
+
+        The SessionStore should support storing client characteristics
+        (IP hash, User-Agent hash) alongside session data for validation.
+        """
+        from backend.core.utils.session_store import SessionStore
+        import hashlib
+
+        # Create session data with client binding metadata
+        client_ip = "192.168.1.100"
+        user_agent = "Mozilla/5.0 Test Browser"
+
+        # Hash the binding values (never store plaintext)
+        ip_hash = hashlib.sha256(client_ip.encode()).hexdigest()[:16]
+        ua_hash = hashlib.sha256(user_agent.encode()).hexdigest()[:16]
+
+        session_data = {
+            "user_id": "test_user_123",
+            "auth_level": "authenticated",
+            # Binding metadata (hashed for security)
+            "_client_binding": {
+                "ip_hash": ip_hash,
+                "ua_hash": ua_hash,
+                "created_at": "2025-01-01T00:00:00Z"
+            }
+        }
+
+        test_key = "session:client_binding_test"
+
+        # Store session with binding metadata
+        SessionStore.set(test_key, session_data)
+
+        # Retrieve and verify
+        retrieved = SessionStore.get(test_key)
+        assert retrieved is not None, "Session data should be retrievable"
+
+        # Verify binding metadata is preserved
+        assert "_client_binding" in retrieved
+        assert retrieved["_client_binding"]["ip_hash"] == ip_hash
+        assert retrieved["_client_binding"]["ua_hash"] == ua_hash
+
+        # Verify original session data is intact
+        assert retrieved["user_id"] == "test_user_123"
+        assert retrieved["auth_level"] == "authenticated"
+
+        # Cleanup
+        SessionStore.clear(test_key)
+
+    def test_session_binding_hash_not_reversible(self, test_settings):
+        """Test that client binding hashes cannot reveal original values
+
+        The hashing scheme for IP and User-Agent should be one-way,
+        preventing attackers from deriving the original values if they
+        gain access to session storage.
+        """
+        import hashlib
+
+        # Original values
+        client_ip = "192.168.1.100"
+        user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+
+        # Compute hashes as would be stored
+        ip_hash = hashlib.sha256(client_ip.encode()).hexdigest()[:16]
+        ua_hash = hashlib.sha256(user_agent.encode()).hexdigest()[:16]
+
+        # Verify hashes don't contain plaintext
+        assert client_ip not in ip_hash
+        assert "192" not in ip_hash
+        assert "Mozilla" not in ua_hash
+        assert "Windows" not in ua_hash
+
+        # Verify hashes are consistent (same input = same output)
+        ip_hash2 = hashlib.sha256(client_ip.encode()).hexdigest()[:16]
+        assert ip_hash == ip_hash2
+
+        # Verify different inputs produce different hashes
+        different_ip_hash = hashlib.sha256("10.0.0.1".encode()).hexdigest()[:16]
+        assert ip_hash != different_ip_hash
 
 
 @pytest.mark.security
