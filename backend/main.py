@@ -42,8 +42,10 @@ logger.info(
 
 # Import and register API routers
 from backend.api.auth import router as auth_router
+from backend.api.tools import router as tools_router
 
 app.include_router(auth_router)
+app.include_router(tools_router)
 
 
 # Health check endpoint
