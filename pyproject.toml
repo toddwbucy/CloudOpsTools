@@ -176,11 +176,7 @@ python_functions = [
 ]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-<<<<<<< HEAD
     "integration: marks tests as integration tests",
-=======
-    "integration: marks tests as integration tests", 
->>>>>>> origin/main
     "unit: marks tests as unit tests",
     "security: marks tests as security tests",
     "critical: marks tests as critical path tests",
