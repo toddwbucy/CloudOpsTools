@@ -5,11 +5,13 @@ Tests encryption, data handling, and privacy measures that will be
 implemented during Phase 1 security fixes.
 """
 
+import base64
+import json
 import os
 import tempfile
 import pytest
 from pathlib import Path
-from unittest.mock import patch, mock_open
+from unittest.mock import patch, mock_open, MagicMock
 
 # Mark all tests in this module as security tests
 pytestmark = pytest.mark.security
@@ -19,40 +21,242 @@ pytestmark = pytest.mark.security
 @pytest.mark.encryption
 class TestDataEncryption:
     """Test data encryption and secure storage"""
-    
+
     def test_secret_key_entropy(self, test_settings):
         """Test SECRET_KEY has sufficient entropy"""
         secret = test_settings.SECRET_KEY
-        
+
         # Should be at least 32 characters
         assert len(secret) >= 32
-        
+
         # Should not be the default insecure value
         assert secret != "your-secret-key-here-change-in-production"
-        
+
         # Should have reasonable entropy (not all same character)
         unique_chars = len(set(secret.lower()))
         assert unique_chars >= 10  # At least 10 different characters
-    
+
     def test_database_encryption_ready(self, test_settings):
         """Test database is ready for encryption"""
         # SQLite supports encryption with proper extensions
         db_url = test_settings.DATABASE_URL
         assert "sqlite://" in db_url
-        
+
         # Path should be secure location
         if ":" in db_url:
             db_path = db_url.split(":")[-1].replace("///", "/")
             assert not db_path.startswith("/tmp")  # Not in temp directory
-    
+
     def test_session_encryption_configuration(self, test_settings):
         """Test session encryption is properly configured"""
         # SECRET_KEY should be suitable for session encryption
         assert isinstance(test_settings.SECRET_KEY, str)
         assert len(test_settings.SECRET_KEY.encode()) >= 32
-        
+
         # Session lifetime should be reasonable for security
         assert test_settings.SESSION_LIFETIME_MINUTES <= 480  # Max 8 hours
+
+    def test_credential_encryption_roundtrip(self, test_settings):
+        """Test credentials can be encrypted and decrypted correctly"""
+        from backend.core.utils.encryption import CredentialEncryption
+
+        # Create encryption instance
+        encryption = CredentialEncryption()
+
+        # Test credentials (plaintext)
+        test_credentials = {
+            "access_key": "AKIAIOSFODNN7EXAMPLE",
+            "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            "session_token": "IQoJb3JpZ2luX2VjEJr...test-token...",
+            "environment": "com",
+        }
+
+        # Encrypt the credentials
+        encrypted = encryption.encrypt_credentials(test_credentials)
+
+        # Encrypted data should be a string (base64-encoded Fernet token)
+        assert isinstance(encrypted, str)
+
+        # Encrypted value should NOT contain plaintext credentials
+        assert test_credentials["access_key"] not in encrypted
+        assert test_credentials["secret_key"] not in encrypted
+        assert test_credentials["session_token"] not in encrypted
+
+        # Decrypt and verify
+        decrypted = encryption.decrypt_credentials(encrypted)
+        assert decrypted is not None
+        assert decrypted == test_credentials
+
+    def test_encrypted_data_not_plaintext(self, test_settings):
+        """Test encrypted data is not stored as plaintext in DB format"""
+        from backend.core.utils.encryption import CredentialEncryption
+
+        encryption = CredentialEncryption()
+
+        # Sensitive data to encrypt
+        sensitive_data = {
+            "password": "SuperSecretPassword123!",
+            "api_key": "sk-1234567890abcdef",
+            "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
+        }
+
+        encrypted = encryption.encrypt_credentials(sensitive_data)
+
+        # Verify encrypted data doesn't contain any sensitive values
+        for key, value in sensitive_data.items():
+            assert value not in encrypted, f"Plaintext '{key}' found in encrypted data"
+
+        # Verify encrypted data is base64-like (Fernet format)
+        # Fernet tokens start with 'gAAAAA' after base64 encoding
+        assert encrypted.startswith("gAAAAA"), "Encrypted data should be Fernet format"
+
+    def test_different_inputs_produce_different_ciphertexts(self, test_settings):
+        """Test encryption produces different ciphertexts for same input (due to IV)"""
+        from backend.core.utils.encryption import CredentialEncryption
+
+        encryption = CredentialEncryption()
+
+        credentials = {"secret": "test-secret-value"}
+
+        # Encrypt the same data twice
+        encrypted1 = encryption.encrypt_credentials(credentials)
+        encrypted2 = encryption.encrypt_credentials(credentials)
+
+        # Due to random IV/nonce, same plaintext produces different ciphertext
+        assert encrypted1 != encrypted2, "Same input should produce different ciphertexts"
+
+        # But both should decrypt to the same value
+        decrypted1 = encryption.decrypt_credentials(encrypted1)
+        decrypted2 = encryption.decrypt_credentials(encrypted2)
+        assert decrypted1 == decrypted2 == credentials
+
+    def test_session_store_encrypts_credentials(self, test_settings, db_session):
+        """Test SessionStore encrypts credentials when feature flag is enabled"""
+        from backend.core.utils.session_store import SessionStore
+        from backend.db.models.session_store import SessionData
+        from sqlalchemy import select
+
+        # Test credentials
+        test_creds = {
+            "access_key": "AKIAIOSFODNN7EXAMPLE",
+            "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+        }
+
+        test_key = "credentials:test_session_123"
+
+        # Mock the feature flag to be enabled
+        with patch('backend.core.utils.session_store.is_feature_enabled', return_value=True):
+            SessionStore.set(test_key, test_creds)
+
+            # Query database directly to verify stored data
+            row = db_session.scalar(
+                select(SessionData).where(SessionData.key == test_key)
+            )
+
+            if row:
+                stored_data = row.data
+
+                # Stored data should be encrypted (string, not dict)
+                assert isinstance(stored_data, str), "Encrypted data should be stored as string"
+
+                # Stored data should NOT contain plaintext credentials
+                assert "AKIAIOSFODNN7EXAMPLE" not in str(stored_data)
+                assert "wJalrXUtnFEMI" not in str(stored_data)
+
+                # Stored data should be Fernet format
+                assert stored_data.startswith("gAAAAA"), "Should be Fernet encrypted format"
+
+                # Cleanup
+                SessionStore.clear(test_key)
+
+    def test_encrypted_credentials_not_readable_without_key(self, test_settings):
+        """Test encrypted credentials cannot be read without correct key"""
+        from backend.core.utils.encryption import CredentialEncryption
+        from cryptography.fernet import Fernet, InvalidToken
+
+        encryption = CredentialEncryption()
+
+        credentials = {
+            "access_key": "AKIAIOSFODNN7EXAMPLE",
+            "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+        }
+
+        encrypted = encryption.encrypt_credentials(credentials)
+
+        # Try to decrypt with a different (random) key
+        wrong_key = Fernet.generate_key()
+        wrong_fernet = Fernet(wrong_key)
+
+        with pytest.raises(InvalidToken):
+            wrong_fernet.decrypt(encrypted.encode('utf-8'))
+
+    def test_corrupted_encrypted_data_fails_safely(self, test_settings):
+        """Test corrupted encrypted data returns None (doesn't crash)"""
+        from backend.core.utils.encryption import CredentialEncryption
+
+        encryption = CredentialEncryption()
+
+        # Various types of corrupted data
+        corrupted_inputs = [
+            "not-valid-encrypted-data",
+            "gAAAAABhelloworld",  # Wrong format
+            "",  # Empty string
+            "gAAAAA" + "x" * 100,  # Invalid base64
+        ]
+
+        for corrupted in corrupted_inputs:
+            result = encryption.decrypt_credentials(corrupted)
+            assert result is None, f"Corrupted data '{corrupted[:20]}...' should return None"
+
+    def test_db_stored_value_differs_from_plaintext(self, test_settings, db_session):
+        """Test DB-level verification: stored value != plaintext credentials"""
+        from backend.core.utils.session_store import SessionStore
+        from backend.db.models.session_store import SessionData
+        from sqlalchemy import select
+        import json
+
+        # Plaintext credentials
+        plaintext_creds = {
+            "access_key": "AKIAEXAMPLEKEY123456",
+            "secret_key": "SuperSecretKeyThatShouldNeverAppearInDB",
+            "session_token": "LongSessionTokenValue12345",
+        }
+
+        test_key = "credentials:db_verification_test"
+
+        # Store with encryption enabled
+        with patch('backend.core.utils.session_store.is_feature_enabled', return_value=True):
+            SessionStore.set(test_key, plaintext_creds)
+
+            # Direct database query - bypassing SessionStore.get()
+            row = db_session.scalar(
+                select(SessionData).where(SessionData.key == test_key)
+            )
+
+            if row:
+                raw_db_value = row.data
+
+                # Convert to string for comparison
+                if isinstance(raw_db_value, dict):
+                    raw_str = json.dumps(raw_db_value)
+                else:
+                    raw_str = str(raw_db_value)
+
+                # Verify none of the plaintext values appear in raw DB storage
+                assert plaintext_creds["access_key"] not in raw_str, \
+                    "Access key found in raw DB value - not encrypted!"
+                assert plaintext_creds["secret_key"] not in raw_str, \
+                    "Secret key found in raw DB value - not encrypted!"
+                assert plaintext_creds["session_token"] not in raw_str, \
+                    "Session token found in raw DB value - not encrypted!"
+
+                # Verify the stored value is encrypted (Fernet format)
+                if isinstance(raw_db_value, str):
+                    assert raw_db_value.startswith("gAAAAA"), \
+                        "Stored value should be Fernet encrypted"
+
+                # Cleanup
+                SessionStore.clear(test_key)
 
 
 @pytest.mark.security
