@@ -1,3 +1,9 @@
+"""
+Application configuration using Pydantic Settings.
+
+Configuration values can be set via environment variables or .env file.
+"""
+
 from enum import Enum
 from pathlib import Path
 from typing import List, Optional
@@ -45,7 +51,14 @@ class AWSCredentials(BaseSettings):
 
 
 class Settings(BaseSettings):
-    """Application settings"""
+    """Application settings with environment variable support."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="allow",
+    )
 
     # Application settings
     APP_NAME: str = "PCM-Ops Tools"
@@ -100,11 +113,14 @@ class Settings(BaseSettings):
     MAX_CONCURRENT_EXECUTIONS: int = 5
     EXECUTION_TIMEOUT: int = 1800  # 30 minutes
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=True,
-    )
+    # Rate limiting configuration
+    RATE_LIMIT_AUTH_ENDPOINTS: str = "10/minute"
+    RATE_LIMIT_EXECUTION_ENDPOINTS: str = "5/minute"
+    RATE_LIMIT_READ_ENDPOINTS: str = "100/minute"
+
+    # Optional Redis URL for distributed rate limiting
+    # When set, rate limits will be shared across multiple instances
+    REDIS_URL: Optional[str] = None
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
@@ -195,5 +211,5 @@ class Settings(BaseSettings):
             pass
 
 
-# Create settings instance
+# Global settings instance
 settings = Settings()

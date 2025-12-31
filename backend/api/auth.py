@@ -4,9 +4,11 @@ from typing import Dict, Optional, Tuple, Union
 
 import boto3
 from botocore.exceptions import ClientError
-from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, field_validator
+from fastapi import APIRouter, HTTPException, Request, status
+from pydantic import BaseModel, Field, field_validator
 
+from backend.core.config import settings
+from backend.core.limiter import limiter
 from backend.providers.aws.common.services.credential_manager import CredentialManager
 
 logger = logging.getLogger(__name__)
@@ -251,20 +253,24 @@ class CredentialCheckResponse(BaseModel):
 
 
 @router.post("/aws-credentials", response_model=CredentialResponse)
-def validate_aws_credentials(request: CredentialRequest) -> CredentialResponse:
+@limiter.limit(settings.rate_limit_auth_endpoints)
+def validate_aws_credentials(request: Request, req: CredentialRequest) -> CredentialResponse:
     """
     Validate AWS credentials without storing them.
 
     This endpoint validates AWS credentials for a specific environment (gov or com)
     but does NOT store them server-side. The frontend stores credentials
     in the session and sends them with each API request that needs them.
+    
+    This endpoint is rate limited to prevent abuse and brute force attacks.
+    Rate limit: Configured via settings.rate_limit_auth_endpoints
     """
     # Use validation-only function instead of storing
     success, message = _validate_credentials_only(
-        access_key=request.access_key,
-        secret_key=request.secret_key,
-        session_token=request.session_token,
-        environment=request.environment,
+        access_key=req.access_key,
+        secret_key=req.secret_key,
+        session_token=req.session_token,
+        environment=req.environment,
     )
 
     if not success:
@@ -274,12 +280,12 @@ def validate_aws_credentials(request: CredentialRequest) -> CredentialResponse:
     response = CredentialResponse(
         success=True,
         message=message,
-        environment=request.environment,
-        temporary=request.session_token is not None,
+        environment=req.environment,
+        temporary=req.session_token is not None,
     )
 
     # For temporary credentials, calculate expiration (STS tokens typically last 45 min)
-    if request.session_token is not None:
+    if req.session_token is not None:
         # Default STS token duration is 45 minutes
         now = time.time()
         expiration_time = now + (45 * 60)  # 45 minutes from now
@@ -292,12 +298,16 @@ def validate_aws_credentials(request: CredentialRequest) -> CredentialResponse:
 
 
 @router.get("/aws-credentials/{environment}", response_model=CredentialStatusResponse)
-def get_aws_credential_status(environment: str) -> CredentialStatusResponse:
+@limiter.limit(settings.rate_limit_auth_endpoints)
+def get_aws_credential_status(request: Request, environment: str) -> CredentialStatusResponse:
     """
     Get status of AWS credentials for a specific environment.
 
     This endpoint checks if valid credentials exist for the specified environment
     and returns their expiration time if available.
+    
+    This endpoint is rate limited to prevent enumeration attacks.
+    Rate limit: Configured via settings.rate_limit_auth_endpoints
     """
     try:
         status_data = cm.are_credentials_valid(environment)  # type: ignore
@@ -330,11 +340,15 @@ def get_aws_credential_status(environment: str) -> CredentialStatusResponse:
 @router.delete(
     "/aws-credentials/{environment}", response_model=Dict[str, Union[str, bool]]
 )
-def clear_aws_credentials(environment: str) -> Dict[str, Union[str, bool]]:
+@limiter.limit(settings.rate_limit_auth_endpoints)
+def clear_aws_credentials(request: Request, environment: str) -> Dict[str, Union[str, bool]]:
     """
     Clear AWS credentials for a specific environment.
 
     This endpoint removes stored credentials for the specified environment.
+    
+    This endpoint is rate limited to prevent abuse.
+    Rate limit: Configured via settings.rate_limit_auth_endpoints
     """
     cm.clear_credentials(environment)
 
@@ -345,13 +359,17 @@ def clear_aws_credentials(environment: str) -> Dict[str, Union[str, bool]]:
 
 
 @router.get("/aws-credentials", response_model=CredentialEnvironmentsResponse)
-def list_aws_credential_environments() -> CredentialEnvironmentsResponse:
+@limiter.limit(settings.rate_limit_auth_endpoints)
+def list_aws_credential_environments(request: Request) -> CredentialEnvironmentsResponse:
     """
     List all supported AWS credential environments.
 
     With client-side credential management, this endpoint returns the static
     list of supported environments. Actual credential validity is managed
     client-side.
+    
+    This endpoint is rate limited to prevent enumeration attacks.
+    Rate limit: Configured via settings.rate_limit_auth_endpoints
     """
     # Return static list of supported environments
     supported_environments = ["com", "gov"]
@@ -365,12 +383,16 @@ def list_aws_credential_environments() -> CredentialEnvironmentsResponse:
 
 
 @router.get("/aws-check-credentials", response_model=CredentialCheckResponse)
-def check_aws_credentials() -> CredentialCheckResponse:
+@limiter.limit(settings.rate_limit_auth_endpoints)
+def check_aws_credentials(request: Request) -> CredentialCheckResponse:
     """
     Check status of backend-configured AWS credentials.
 
     This endpoint checks which environments have valid credentials configured
     through environment variables and returns their status.
+    
+    This endpoint is rate limited to prevent enumeration attacks.
+    Rate limit: Configured via settings.rate_limit_auth_endpoints
     """
     result = CredentialCheckResponse()
 

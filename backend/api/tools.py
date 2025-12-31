@@ -1,8 +1,10 @@
 from typing import Any, Dict, List, Optional, cast
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
+from backend.core.config import settings
+from backend.core.limiter import limiter
 from backend.core.schemas.script import Tool
 from backend.db.models.script import Tool as ToolModel
 from backend.db.session import get_db
@@ -12,11 +14,13 @@ router = APIRouter()
 
 
 @router.get("/", response_model=List[Tool])
-def list_tools(db: Session = Depends(get_db)) -> List[Tool]:
+@limiter.limit(settings.rate_limit_read_endpoints)
+async def list_tools(request: Request, db: Session = Depends(get_db)) -> List[Tool]:
     """
     List all available tools.
 
     This endpoint retrieves all registered tools that can be used for script execution.
+    Rate limit: Read endpoints limit per minute per IP address.
     """
     tools = db.query(ToolModel).all()
     # Convert SQLAlchemy models to Pydantic schemas
@@ -24,11 +28,13 @@ def list_tools(db: Session = Depends(get_db)) -> List[Tool]:
 
 
 @router.get("/{tool_id}", response_model=Tool)
-def get_tool(tool_id: int, db: Session = Depends(get_db)) -> Tool:
+@limiter.limit(settings.rate_limit_read_endpoints)
+async def get_tool(request: Request, tool_id: int, db: Session = Depends(get_db)) -> Tool:
     """
     Get a specific tool by ID.
 
     This endpoint retrieves detailed information about a tool.
+    Rate limit: Read endpoints limit per minute per IP address.
     """
     tool = db.query(ToolModel).filter(ToolModel.id == tool_id).first()
 
@@ -43,7 +49,9 @@ def get_tool(tool_id: int, db: Session = Depends(get_db)) -> Tool:
 
 
 @router.post("/{tool_id}/execute", response_model=Dict[str, Any])
-def execute_tool(
+@limiter.limit(settings.rate_limit_execution_endpoints)
+async def execute_tool(
+    request: Request,
     tool_id: int,
     parameters: Dict[str, Any] = Body(...),
     account_id: Optional[str] = Query(
@@ -59,6 +67,7 @@ def execute_tool(
 
     This endpoint allows for direct execution of a tool with custom parameters
     without creating a script. The tool will be executed on the specified instance.
+    This endpoint is rate limited more strictly due to resource consumption.
     """
     import logging
     from pathlib import Path
@@ -232,13 +241,15 @@ def execute_tool(
 
 
 @router.get("/{tool_id}/scripts", response_model=List[Dict[str, Any]])
-def list_tool_scripts(
-    tool_id: int, db: Session = Depends(get_db)
+@limiter.limit(settings.rate_limit_read_endpoints)
+async def list_tool_scripts(
+    request: Request, tool_id: int, db: Session = Depends(get_db)
 ) -> List[Dict[str, Any]]:
     """
     List all scripts associated with a specific tool.
 
     This endpoint retrieves all scripts that use a particular tool.
+    Rate limit: Read endpoints limit per minute per IP address.
     """
     # Check if tool exists
     tool = db.query(ToolModel).filter(ToolModel.id == tool_id).first()
@@ -249,7 +260,7 @@ def list_tool_scripts(
             detail=f"Tool with ID {tool_id} not found",
         )
 
-    # Return scripts associated with this tool
+    # Return scripts associatedwith this tool
     scripts: List[Dict[str, Any]] = []
     if tool.scripts is not None:
         scripts = [

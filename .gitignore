@@ -206,5 +206,8 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-# Auto Claude data directory
+# Claude Code - local configuration and status files
 .auto-claude/
+.auto-claude-status
+.claude_settings.json
+CLAUDE.md

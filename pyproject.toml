@@ -16,6 +16,9 @@ python-multipart = ">=0.0.6"
 httpx = ">=0.24.0"
 requests = ">=2.31.0"
 
+# Rate limiting
+slowapi = ">=0.1.9"
+
 # Database
 sqlalchemy = ">=2.0.8"
 aiosqlite = ">=0.18.0"  # For SQLite async support
@@ -47,6 +50,12 @@ fastmcp = "^2.10.6"
 cryptography = "^45.0.6"
 aiobotocore = "^2.26.0"
 types-aiobotocore = "^2.26.0.post2"
+
+# Optional: Redis for distributed rate limiting
+redis = {extras = ["hiredis"], version = ">=4.5.0", optional = true}
+
+[tool.poetry.extras]
+redis = ["redis"]
 
 [tool.poetry.group.dev.dependencies]
 # Testing
@@ -167,7 +176,7 @@ python_functions = [
 ]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "integration: marks tests as integration tests", 
+    "integration: marks tests as integration tests",
     "unit: marks tests as unit tests",
     "security: marks tests as security tests",
     "critical: marks tests as critical path tests",

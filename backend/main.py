@@ -7,8 +7,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from backend.core.config import settings
+from backend.core.limiter import limiter
 from backend.db.base import Base
 from backend.db.models import account as _model_account  # noqa: F401
 from backend.db.models import change as _model_change  # noqa: F401
@@ -43,6 +46,21 @@ app = FastAPI(
     title="PCM-Ops Tools",
     description="Unified platform for cloud operations management",
     version="2.0.0",
+)
+
+# Attach limiter to app.state for access in route decorators
+# This must be done before applying @limiter.limit() decorators
+app.state.limiter = limiter
+
+# Add global exception handler for rate limit exceeded errors
+# This ensures consistent HTTP 429 responses with Retry-After headers
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+logger.info(
+    "Rate limiting initialized with configuration: auth=%s, execution=%s, read=%s",
+    settings.rate_limit_auth_endpoints,
+    settings.rate_limit_execution_endpoints,
+    settings.rate_limit_read_endpoints,
 )
 
 # Add session middleware
@@ -145,18 +163,66 @@ from backend.providers import discover_provider_routers
 provider_info = discover_provider_routers(app)
 
 
-# Health check endpoint
-@app.get("/api/health")
+def _check_storage_health() -> dict:
+    """
+    Check the health of the rate limiting storage backend.
+
+    Returns dict with storage health status and details.
+    """
+    storage_type = "redis" if settings.redis_url else "memory"
+
+    if storage_type == "memory":
+        return {
+            "type": "memory",
+            "healthy": True,
+            "message": "In-memory storage active",
+        }
+
+    # Check Redis connectivity if configured
+    try:
+        import redis
+
+        # Parse Redis URL and test connection
+        client = redis.from_url(settings.redis_url, socket_timeout=2)
+        client.ping()
+        return {
+            "type": "redis",
+            "healthy": True,
+            "message": "Redis connection successful",
+        }
+    except ImportError:
+        return {
+            "type": "redis",
+            "healthy": False,
+            "message": "Redis client not installed",
+        }
+    except Exception as e:
+        logger.warning("Redis health check failed: %s", str(e))
+        return {
+            "type": "redis",
+            "healthy": False,
+            "message": f"Redis connection failed: {str(e)}",
+        }
+
+
+# Health check endpoints
+@app.get("/health")
 def health_check():
+    """Basic health check endpoint."""
+    return {"status": "healthy"}
+
+
+@app.get("/api/health")
+def api_health_check():
     """
     Enhanced health check endpoint with detailed status information.
     
-    Returns system health including database connectivity, dependencies, and version info.
+    Returns system health including database connectivity, rate limiting status,
+    storage backend health, dependencies, and version info.
     """
     from backend.core.utils.database_helpers import check_database_health
     from backend.providers.aws.common.services.credential_manager import CredentialManager
     from datetime import datetime
-    import os
     
     # Initialize health status
     health_status = {
@@ -228,6 +294,37 @@ def health_check():
             "error": str(e)
         }
         health_status["status"] = "unhealthy"
+    
+    # Check rate limiting storage backend health
+    storage_health = _check_storage_health()
+    rate_limit_enabled = hasattr(app.state, "limiter") and app.state.limiter is not None
+    rate_limit_status = "enabled" if rate_limit_enabled else "disabled"
+    
+    if rate_limit_enabled and not storage_health["healthy"]:
+        rate_limit_status = "degraded"
+        health_status["status"] = "degraded"
+    
+    health_status["services"]["rate_limiting"] = {
+        "status": rate_limit_status,
+        "storage": storage_health,
+        "configuration": {
+            "auth_endpoints": settings.rate_limit_auth_endpoints,
+            "execution_endpoints": settings.rate_limit_execution_endpoints,
+            "read_endpoints": settings.rate_limit_read_endpoints,
+        },
+        "endpoints_protected": {
+            "auth": [
+                "/api/auth/aws-credentials",
+            ],
+            "execution": [
+                "/api/tools/{tool_id}/execute",
+            ],
+            "read": [
+                "/api/tools/",
+                "/api/tools/{tool_id}",
+            ],
+        },
+    }
     
     # Set HTTP status code based on health
     from fastapi import Response
