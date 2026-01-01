@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 from typing import List, Optional
 
-logger = logging.getLogger("pcm_ops_tools.aws.tasks")
+logger = logging.getLogger("cloudopstools.aws.tasks")
 
 # Polling configuration constants
 POLLING_MAX_ATTEMPTS = 60

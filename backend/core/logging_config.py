@@ -191,7 +191,7 @@ def setup_security_logging(enable_structured_logging: bool = False) -> None:
             },
             'file': {
                 'class': 'logging.handlers.RotatingFileHandler',
-                'filename': 'logs/pcm_ops_tools.log',
+                'filename': 'logs/cloudopstools.log',
                 'maxBytes': 10485760,  # 10MB
                 'backupCount': 10,
                 'level': 'DEBUG',

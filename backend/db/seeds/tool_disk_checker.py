@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.db.models.script import Tool
 
-logger = logging.getLogger("pcm_ops_tools.seeds")
+logger = logging.getLogger("cloudopstools.seeds")
 
 
 def create_disk_checker_tool(db: Session) -> Tool:

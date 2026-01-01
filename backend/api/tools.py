@@ -75,27 +75,8 @@ async def execute_tool(
     from backend.providers.aws.common.services.credential_manager import (
         CredentialManager,
     )
-
-    # Placeholder classes for type checking only
-    class EC2Service:
-        # Placeholder for type checking - actual implementation required
-        def __init__(self, session: Any, region: str) -> None:
-            self.session = session
-            self.region = region
-
-        def get_instance(self, instance_id: str) -> Dict[str, Any]:
-            raise NotImplementedError("EC2Service is a placeholder - actual implementation required")
-
-    # Placeholder for type checking - actual implementation required
-    class ScriptRunner:
-        def __init__(self, session: Any, region: str) -> None:
-            self.session = session
-            self.region = region
-
-        def run_command(
-            self, instance_id: str, command: str, **kwargs: Any
-        ) -> Dict[str, Any]:
-            raise NotImplementedError("ScriptRunner is a placeholder - actual implementation required")
+    from backend.providers.aws.script_runner.services.ec2_manager import EC2Manager
+    from backend.providers.aws.script_runner.services.ssm_executor import SSMExecutor
 
     logger = logging.getLogger(__name__)
 
@@ -163,58 +144,101 @@ async def execute_tool(
         if output_file:
             command += f" --output {output_file}"
 
-        # Set up EC2 service
-        # Ensure region is not None before passing to EC2Service
+        # Set up EC2 manager
+        # Ensure region is not None before making API calls
         safe_region = (
             region if region is not None else "us-east-1"
         )  # Default to us-east-1 if region is None
-        ec2_service = EC2Service(session, safe_region)
+
+        # Get account_id if not provided
+        if not account_id:
+            credential_manager_temp = CredentialManager()
+            ec2_manager_temp = EC2Manager(credential_manager_temp)
+            account_id = await ec2_manager_temp.get_account_id(environment)
+            if not account_id:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to determine AWS account ID",
+                )
+
+        ec2_manager = EC2Manager(credential_manager)
 
         try:
             # Verify instance exists
-            instance = ec2_service.get_instance(instance_id)
-            if not instance:
+            instances = await ec2_manager.describe_instances(
+                account_id=account_id,
+                region=safe_region,
+                environment=environment,
+                instance_ids=[instance_id]
+            )
+
+            if not instances:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Instance {instance_id} not found in region {region}",
+                    detail=f"Instance {instance_id} not found in region {safe_region}",
                 )
 
+            instance = instances[0]
+
             # Check platform
-            platform = instance.get("platform", "linux")
+            platform = instance.get("Platform", "linux").lower()
             if platform != tool.platform:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Tool '{tool.name}' is for {tool.platform} platforms, but instance is {platform}",
                 )
 
-            # Create script runner
-            # Ensure region is not None before passing to ScriptRunner
-            safe_region = (
-                region if region is not None else "us-east-1"
-            )  # Default to us-east-1 if region is None
-            script_runner = ScriptRunner(session, safe_region)
+            # Create SSM executor
+            ssm_executor = SSMExecutor(credential_manager)
+
+            # Read script content
+            script_content = full_script_path.read_text()
 
             # Execute script
             logger.info(f"Executing {tool.name} on {instance_id}")
-            result = script_runner.run_command(
+
+            # Send command and wait for completion
+            command_id = await ssm_executor.send_command(
                 instance_id=instance_id,
-                command=command,
-                working_dir="/tmp",
-                script_content=full_script_path.read_text(),
-                timeout=300,  # 5 minutes timeout
+                command=script_content,
+                account_id=account_id,
+                region=safe_region,
+                environment=environment,
+                comment=f"Executing tool: {tool.name}",
+                timeout_seconds=300,  # 5 minutes timeout
             )
+
+            if not command_id:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to send command to instance",
+                )
+
+            # Wait for command to complete
+            result = await ssm_executor.wait_for_command_completion(
+                command_id=command_id,
+                instance_id=instance_id,
+                account_id=account_id,
+                region=safe_region,
+                environment=environment,
+                timeout_seconds=300,
+            )
+
+            # Parse result and return
+            status_value = result.get("Status", "Unknown")
+            exit_code = result.get("ExitCode", -1)
+            output = result.get("Output", "")
+            error = result.get("Error", "")
 
             return {
                 "tool_id": tool_id,
                 "tool_name": tool.name,
-                "status": "success" if result["exit_code"] == 0 else "error",
+                "status": "success" if status_value == "Success" else "error",
                 "instance_id": instance_id,
-                "exit_code": result["exit_code"],
-                "output": result["stdout"],
-                "error": result["stderr"] if result["stderr"] else None,
-                "execution_time": (
-                    result["execution_time"] if "execution_time" in result else None
-                ),
+                "exit_code": exit_code,
+                "output": output,
+                "error": error if error else None,
+                "command_id": command_id,
             }
 
         except Exception as e:

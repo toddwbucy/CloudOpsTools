@@ -53,8 +53,8 @@ class TestSettings:
             
             settings = Settings()
             
-            assert settings.DATABASE_URL == "sqlite:///./data/pcm_ops_tools.db"
-            assert settings.SQLITE_DATABASE_URI == "sqlite:///./data/pcm_ops_tools.db"
+            assert settings.DATABASE_URL == "sqlite:///./data/cloudopstools.db"
+            assert settings.SQLITE_DATABASE_URI == "sqlite:///./data/cloudopstools.db"
     
     def test_cors_origins_default(self):
         """Test default CORS origins"""
