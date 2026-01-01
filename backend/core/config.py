@@ -5,6 +5,8 @@ settings. It supports multiple cloud providers with environment-specific
 credentials while maintaining backward compatibility with existing AWS
 environment variables.
 
+Configuration values can be set via environment variables or .env file.
+
 Example usage:
     from backend.core.config import settings
 
@@ -15,6 +17,8 @@ Example usage:
     aws_creds = settings.get_provider_credentials("aws", "com")
 """
 
+import logging
+from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -33,7 +37,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        extra="ignore",  # Ignore extra env vars not defined in the model
+        case_sensitive=False,
+        extra="allow",
     )
 
     # Application settings
@@ -92,11 +97,18 @@ class Settings(BaseSettings):
     # Default provider when not specified in session
     DEFAULT_PROVIDER: str = "aws"
 
-    # Rate limiting configuration
+    # Rate limiting configuration (both naming conventions for compatibility)
+    RATE_LIMIT_AUTH_ENDPOINTS: str = "10/minute"
+    RATE_LIMIT_EXECUTION_ENDPOINTS: str = "5/minute"
+    RATE_LIMIT_READ_ENDPOINTS: str = "100/minute"
     rate_limit_auth_endpoints: str = "10/minute"
     rate_limit_execution_endpoints: str = "5/minute"
     rate_limit_read_endpoints: str = "100/minute"
-    redis_url: Optional[str] = None  # Optional Redis backend for distributed rate limiting
+
+    # Optional Redis URL for distributed rate limiting
+    # When set, rate limits will be shared across multiple instances
+    REDIS_URL: Optional[str] = None
+    redis_url: Optional[str] = None  # Alias for compatibility
 
     def get_provider_credentials(
         self, provider: str, environment: Optional[str] = None

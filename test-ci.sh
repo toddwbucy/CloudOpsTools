@@ -71,7 +71,7 @@ timeout 300 poetry install --no-interaction || {
 
 # Set up test database
 log_info "Setting up test database..."
-export DATABASE_URL="sqlite:///./data/pcm_ops_tools_ci_test.db"
+export DATABASE_URL="sqlite:///./data/cloudopstools_ci_test.db"
 poetry run python backend/db/init_db.py || {
     log_error "Database initialization failed"
     exit 1
@@ -257,7 +257,7 @@ else
 fi
 
 # Cleanup
-rm -f "./data/pcm_ops_tools_ci_test.db" 2>/dev/null || true
+rm -f "./data/cloudopstools_ci_test.db" 2>/dev/null || true
 
 # Archive reports for CI systems
 if [ -n "${CI_ARTIFACTS_DIR:-}" ]; then

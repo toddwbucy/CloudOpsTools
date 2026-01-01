@@ -64,13 +64,13 @@ setup_logging() {
     
     # Create timestamped log file
     TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
-    LOG_FILE="$LOGS_PATH/pcm_ops_tools_$TIMESTAMP.log"
-    
+    LOG_FILE="$LOGS_PATH/cloudopstools_$TIMESTAMP.log"
+
     # Create symlink to latest log
-    ln -sf "pcm_ops_tools_$TIMESTAMP.log" "$LOGS_PATH/pcm_ops_tools.log"
-    
+    ln -sf "cloudopstools_$TIMESTAMP.log" "$LOGS_PATH/cloudopstools.log"
+
     # Rotate old logs (keep last 10)
-    find "$LOGS_PATH" -name "pcm_ops_tools_*.log" | sort -r | tail -n +11 | xargs --no-run-if-empty rm
+    find "$LOGS_PATH" -name "cloudopstools_*.log" | sort -r | tail -n +11 | xargs --no-run-if-empty rm
     
     echo -e "${GREEN}Logging set up in $LOGS_PATH${NC}"
 }
@@ -122,8 +122,8 @@ else
 fi
 
 # Always use the main production database
-export DATABASE_URL="sqlite:///./data/pcm_ops_tools.db"
-echo -e "${GREEN}Using main database: data/pcm_ops_tools.db${NC}"
+export DATABASE_URL="sqlite:///./data/cloudopstools.db"
+echo -e "${GREEN}Using main database: data/cloudopstools.db${NC}"
 
 # Set log level for the application
 if [ "$LOG_LEVEL" = "debug" ]; then

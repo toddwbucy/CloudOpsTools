@@ -13,7 +13,7 @@ from fastapi import HTTPException
 from backend.providers.aws.common.services.credential_manager import CredentialManager
 from backend.core.utils.logging_config import log_security_event
 
-logger = logging.getLogger("pcm_ops_tools.credentials")
+logger = logging.getLogger("cloudopstools.credentials")
 
 
 def get_credential_manager() -> CredentialManager:

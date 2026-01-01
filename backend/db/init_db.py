@@ -13,7 +13,7 @@ if str(backend_dir) not in sys.path:
 from backend.db.base import Base
 from backend.db.session import engine
 
-logger = logging.getLogger("pcm_ops_tools.database")
+logger = logging.getLogger("cloudopstools.database")
 
 # Import all models explicitly to register them with SQLAlchemy
 # This ensures all tables are created when create_all() is called
